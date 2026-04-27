@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pricoin — privacy-mandatory cryptocurrency</title>
+  <meta name="description" content="Pricoin (PRIC) — a Bitcoin Core fork where every non-coinbase transaction is confidential by consensus: Pedersen amounts, dual-key stealth addresses, CLSAG ring signatures.">
+  <meta name="theme-color" content="#fdfcf9">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+  <link rel="apple-touch-icon" sizes="200x200" href="pricoinlogo-200.png">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" href="#top">
+      <img class="brand-mark" src="pricoinlogo-64.png" alt="" width="32" height="32">
+      <span class="brand-name">Pricoin</span>
+    </a>
+    <nav class="topnav">
+      <a href="#what">What is Pricoin?</a>
+      <a href="#different">Different</a>
+      <a href="#monero">vs Monero</a>
+      <a href="#zcash">vs Zcash</a>
+      <a href="#particl">vs Particl</a>
+      <a href="#coinomics">Coinomics</a>
+      <a href="#mining">Mining</a>
+      <a class="github" href="https://github.com/pricoinfoundation/pricoin" target="_blank" rel="noopener">GitHub →</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <section class="hero">
+    <div class="container hero-grid">
+      <div class="hero-text">
+      <div class="status-badge">Experimental · Educational fork · v0.1.0</div>
+      <h1>Privacy is not a setting.<br>It's the only setting.</h1>
+      <p class="lede">
+        Pricoin (PRIC) is a Bitcoin Core fork where <strong>every non-coinbase
+        transaction is confidential by consensus</strong>. Sender, recipient,
+        and amount are hidden by construction — there is no transparent send
+        path to fall back to.
+      </p>
+      <div class="cta-row">
+        <a class="btn primary" href="https://github.com/pricoinfoundation/pricoin/releases" target="_blank" rel="noopener">Download</a>
+        <a class="btn ghost" href="https://github.com/pricoinfoundation/pricoin" target="_blank" rel="noopener">Source on GitHub</a>
+      </div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <img src="pricoinlogo-200.png" alt="" width="200" height="200">
+      </div>
+    </div>
+  </section>
+
+  <section id="what" class="section">
+    <div class="container">
+      <h2>What is Pricoin?</h2>
+      <p>
+        Pricoin is a peer-to-peer electronic cash system that takes the
+        Bitcoin Core codebase and replaces transparent transactions with a
+        privacy-mandatory transaction format inspired by Monero's RingCT
+        and CryptoNote stealth addresses. Three primitives, all required:
+      </p>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-icon">∑</div>
+          <h3>Confidential amounts</h3>
+          <p>
+            Every output stores a Pedersen commitment <code>C = v·H + b·G</code>
+            instead of a cleartext value. A Borromean rangeproof asserts
+            <code>0 ≤ v &lt; 2⁶⁴</code> without revealing&nbsp;<code>v</code>.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-icon">⌖</div>
+          <h3>Stealth addresses</h3>
+          <p>
+            Your reusable identity is a pair of keys <code>(A, B)</code>. Each
+            payment derives a fresh one-time output script via ECDH. Two
+            payments to the same identity look uncorrelated on chain.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-icon">○</div>
+          <h3>Ring signatures</h3>
+          <p>
+            Each spend hides among <code>N&nbsp;=&nbsp;16</code> ring
+            candidates via multi-layer CLSAG. Double-spends are caught by a
+            tx-invariant key image, not by linking inputs.
+          </p>
+        </div>
+      </div>
+
+      <div class="warning">
+        <strong>Status:</strong> experimental / educational. This is a toy
+        implementation of a real privacy stack. Bugs in confidential
+        transactions or ring signatures break privacy <em>silently</em>
+        without breaking consensus. Do not use this code with real money.
+      </div>
+    </div>
+  </section>
+
+  <section id="different" class="section alt">
+    <div class="container">
+      <h2>How Pricoin is different</h2>
+      <p>
+        Pricoin keeps Bitcoin's economics — 50 PRIC initial reward, ~21
+        million cap, halving every ~4 years — but throws out everything
+        about transparent transactions. The chain looks Bitcoin-shaped from
+        the outside (UTXOs, blocks, scripts) but every spend has Pedersen
+        amounts, ring inputs, and one-time stealth outputs.
+      </p>
+
+      <table class="compare">
+        <thead><tr><th>Aspect</th><th>Bitcoin Core</th><th>Pricoin</th></tr></thead>
+        <tbody>
+          <tr><td>Sender privacy</td><td>None — addresses are public</td><td>CLSAG ring sig, fixed ring size 16</td></tr>
+          <tr><td>Recipient privacy</td><td>Reusable address visible on chain</td><td>Dual-key stealth, one-time output per payment</td></tr>
+          <tr><td>Amount privacy</td><td>Cleartext <code>nValue</code></td><td>Pedersen commitment + Borromean rangeproof</td></tr>
+          <tr><td>Tx version</td><td>1, 2, 3</td><td>4 only (coinbase exempt)</td></tr>
+          <tr><td>Optional privacy?</td><td>—</td><td>No — consensus rejects v1/v2/v3 non-coinbase</td></tr>
+          <tr><td>Block time</td><td>600 s</td><td>150 s</td></tr>
+          <tr><td>Halving interval</td><td>210,000 blocks</td><td>840,000 blocks (preserves 4-year cadence)</td></tr>
+          <tr><td>Proof of work</td><td>SHA-256d (ASIC)</td><td>RandomX (CPU-friendly, 2048-block epoch rotation)</td></tr>
+          <tr><td>Pruning</td><td>Supported</td><td>Disabled (v4 outputs are append-only ring decoys)</td></tr>
+          <tr><td>Address HRP</td><td><code>bc</code> / <code>tb</code> / <code>bcrt</code></td><td><code>pric</code> / <code>tpric</code> / <code>pricrt</code></td></tr>
+        </tbody>
+      </table>
+
+      <p class="note">
+        The wallet's transparent-send RPCs (<code>sendtoaddress</code>,
+        <code>sendmany</code>, <code>send</code>, <code>sendall</code>,
+        <code>bumpfee</code>, <code>psbtbumpfee</code>) are stubbed and
+        return <code>RPC_METHOD_DEPRECATED</code>. Use
+        <code>walletsendct</code> or <code>walletsendct_ring</code>
+        instead.
+      </p>
+    </div>
+  </section>
+
+  <section id="monero" class="section">
+    <div class="container">
+      <h2>Pricoin vs Monero</h2>
+      <p>
+        Pricoin is essentially a Monero-style privacy stack on Bitcoin's
+        curve and codebase. The cryptographic primitives are nearly the
+        same — what differs is the platform.
+      </p>
+
+      <table class="compare">
+        <thead><tr><th></th><th>Pricoin</th><th>Monero</th></tr></thead>
+        <tbody>
+          <tr><td>Codebase lineage</td><td>Bitcoin Core fork</td><td>CryptoNote codebase</td></tr>
+          <tr><td>Curve</td><td>secp256k1 (Bitcoin's)</td><td>Ed25519</td></tr>
+          <tr><td>Recipient privacy</td><td>Dual-key stealth (CryptoNote-style)</td><td>Same</td></tr>
+          <tr><td>Sender privacy</td><td>CLSAG, ring 16, gamma decoys</td><td>Same</td></tr>
+          <tr><td>Amount privacy</td><td>Pedersen + Borromean rangeproofs (~1.3 KB / output)</td><td>Pedersen + Bulletproofs+ (~600 B / tx, log in #outputs)</td></tr>
+          <tr><td>Mandatory privacy</td><td>Yes (consensus enforced)</td><td>Yes (since RingCT mandate, 2017)</td></tr>
+          <tr><td>PoW</td><td>RandomX (vendored from <code>tevador/RandomX</code>)</td><td>RandomX (with epoch rotation)</td></tr>
+          <tr><td>Emission</td><td>Bitcoin-style halving every 840k blocks, 21 M cap</td><td>Smooth + tail emission, ~18.4 M soft cap</td></tr>
+          <tr><td>Block time</td><td>150 s</td><td>120 s</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        <strong>Honest gap:</strong> Pricoin's rangeproofs are about 2× the
+        size of Monero's because Pricoin still uses Borromean — Bulletproofs
+        proper aren't shipped in libsecp256k1-zkp yet. Monero's RingCT has
+        also been hardened by years of attacks (EAE on temporal decoys,
+        Janus, etc.); Pricoin has been hardened by zero.
+      </p>
+    </div>
+  </section>
+
+  <section id="zcash" class="section alt">
+    <div class="container">
+      <h2>Pricoin vs Zcash</h2>
+      <p>
+        Pricoin and Zcash both hide value, sender, and recipient — but the
+        underlying math is fundamentally different, and so are the
+        engineering trade-offs.
+      </p>
+
+      <table class="compare">
+        <thead><tr><th></th><th>Pricoin</th><th>Zcash</th></tr></thead>
+        <tbody>
+          <tr><td>Privacy primitive</td><td>Discrete-log: ring signatures + Pedersen commitments</td><td>zk-SNARKs over a Merkle tree of notes</td></tr>
+          <tr><td>Anonymity set per spend</td><td>Ring size 16 (16 candidates)</td><td>Entire shielded pool (millions of notes)</td></tr>
+          <tr><td>Privacy mandatory</td><td>Yes</td><td><strong>No</strong> — t-addrs and shielded coexist; z2t / t2z bridges leak amounts</td></tr>
+          <tr><td>Trusted setup</td><td>None</td><td>Required historically (Sprout/Sapling); Halo2/Orchard removes it</td></tr>
+          <tr><td>Proof size</td><td>~1.3 KB rangeproof + ~600 B ring sig per input</td><td>~200 B (Orchard) — much smaller</td></tr>
+          <tr><td>Verification cost</td><td>Fast (no pairings)</td><td>Pairing-heavy (slower, but still sub-second)</td></tr>
+          <tr><td>Wallet scan</td><td>View key + ECDH per output</td><td>Incoming viewing key over notes</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        In Zcash's shielded pool, your spend is hidden among <em>every</em>
+        shielded note that has ever existed — the anonymity set is
+        gigantic, and decoy selection is irrelevant. The cost is heavy
+        cryptography (zk-SNARKs), historical trusted setups, and the
+        practical fact that most Zcash usage today is still on transparent
+        addresses.
+      </p>
+      <p>
+        In Pricoin (and Monero) every spend is private by construction,
+        but each one only hides among 16 candidates. Bad decoy selection
+        or temporal heuristics have repeatedly leaked information for
+        specific transactions. The crypto is simpler and faster, the
+        privacy is broader (everyone is private) but shallower (small
+        ring).
+      </p>
+    </div>
+  </section>
+
+  <section id="particl" class="section">
+    <div class="container">
+      <h2>Pricoin vs Particl</h2>
+      <p>
+        Particl is the closest existing project by lineage and cryptography
+        — it's also a Bitcoin Core fork that vendored Monero-style ring
+        confidential transactions. The difference is one of <em>policy</em>:
+        Particl lets each transaction choose its own privacy level; Pricoin
+        does not give the user that choice.
+      </p>
+
+      <table class="compare">
+        <thead><tr><th></th><th>Pricoin</th><th>Particl</th></tr></thead>
+        <tbody>
+          <tr><td>Codebase lineage</td><td>Bitcoin Core fork</td><td>Bitcoin Core fork</td></tr>
+          <tr><td>Output types</td><td>One: v4 confidential</td><td>Three: transparent, blinded (CT), anonymous (RingCT)</td></tr>
+          <tr><td>Privacy mandatory?</td><td><strong>Yes</strong> — consensus rejects v1/v2/v3 non-coinbase</td><td><strong>No</strong> — sender chooses per output</td></tr>
+          <tr><td>Sender privacy</td><td>CLSAG ring sig, ring 16</td><td>MLSAG ring sig (older RingCT)</td></tr>
+          <tr><td>Recipient privacy</td><td>Dual-key stealth (CryptoNote)</td><td>Stealth address option (alongside transparent)</td></tr>
+          <tr><td>Amount privacy</td><td>Pedersen + Borromean rangeproofs</td><td>Pedersen + Bulletproofs</td></tr>
+          <tr><td>Consensus</td><td>Proof of work (RandomX)</td><td>Proof of stake</td></tr>
+          <tr><td>Coinbase</td><td>Transparent (auditable subsidy)</td><td>Transparent (PoS rewards)</td></tr>
+          <tr><td>Block time</td><td>150 s</td><td>120 s</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Why mandatory beats optional</h3>
+      <p>
+        Optional privacy creates an <strong>anonymity-set problem</strong>.
+        If most users send transparently, the few who opt into private
+        transactions stand out — and the on-chain signal of "this user
+        chose privacy" is itself information. Worse, the anonymity set for
+        ring sigs is drawn from past private outputs only, so it grows
+        slowly when most of the chain is transparent.
+      </p>
+      <p>
+        This is exactly the argument Monero made when it removed its
+        transparent-tx option in 2017: the only way to get real privacy
+        from ring signatures is to put <em>everyone</em> in the same
+        anonymity set, by default, with no escape hatch. Pricoin takes
+        the same position at the consensus layer — there is no v1/v2/v3
+        send path to fall back to, so there is no "the people who chose
+        privacy" cohort to single out.
+      </p>
+      <p>
+        Particl's flexibility is genuinely useful for some use cases
+        (regulatory reporting, exchange deposits, etc.). The trade-off is
+        that the privacy guarantee for individual users is weaker than
+        what a mandatory-privacy chain provides.
+      </p>
+    </div>
+  </section>
+
+  <section id="coinomics" class="section">
+    <div class="container">
+      <h2>Coinomics</h2>
+      <p>
+        Pricoin keeps Bitcoin's per-block reward (50 PRIC, halving every
+        ~4 years) but runs at 4× the block rate (150 s vs 600 s). Holding
+        the halving cadence at 4 years means each era spans 4× as many
+        blocks as Bitcoin's, and each era therefore emits 4× as many
+        coins. The supply cap lands at <strong>~84 million PRIC</strong>,
+        not 21 million.
+      </p>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-num">50 PRIC</div>
+          <div class="stat-label">Initial block reward</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">~84 M</div>
+          <div class="stat-label">Total supply cap</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">150 s</div>
+          <div class="stat-label">Target block time</div>
+        </div>
+        <div class="stat">
+          <div class="stat-num">840,000</div>
+          <div class="stat-label">Blocks per halving (~4 years)</div>
+        </div>
+      </div>
+
+      <h3>Halving schedule</h3>
+      <table class="compare">
+        <thead><tr><th>Era</th><th>Block heights</th><th>Reward / block</th><th>Era emission</th><th>Approx years</th></tr></thead>
+        <tbody>
+          <tr><td>0</td><td>0 – 839,999</td><td>50 PRIC</td><td>42,000,000</td><td>0 – 4</td></tr>
+          <tr><td>1</td><td>840,000 – 1,679,999</td><td>25 PRIC</td><td>21,000,000</td><td>4 – 8</td></tr>
+          <tr><td>2</td><td>1,680,000 – 2,519,999</td><td>12.5 PRIC</td><td>10,500,000</td><td>8 – 12</td></tr>
+          <tr><td>3</td><td>2,520,000 – 3,359,999</td><td>6.25 PRIC</td><td>5,250,000</td><td>12 – 16</td></tr>
+          <tr><td>4</td><td>3,360,000 – 4,199,999</td><td>3.125 PRIC</td><td>2,625,000</td><td>16 – 20</td></tr>
+          <tr><td>…</td><td>…</td><td>halve every era</td><td>halve every era</td><td>…</td></tr>
+          <tr><td>33</td><td>27,720,000+</td><td>0</td><td>0</td><td>~132+</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><td colspan="3"><strong>Total emission cap</strong></td><td><strong>~84,000,000 PRIC</strong></td><td>—</td></tr>
+        </tfoot>
+      </table>
+
+      <p>
+        Coinbase remains transparent — subsidy is auditable, total emission
+        verifiable in cleartext, and miners' rewards visible. After
+        coinbase maturity, the funder uses <code>walletsendct</code> to
+        roll mined transparent coins into a confidential output. From that
+        point on, every spend is private.
+      </p>
+    </div>
+  </section>
+
+  <section id="mining" class="section alt">
+    <div class="container">
+      <h2>Mining</h2>
+      <p>
+        Pricoin uses <a href="https://github.com/tevador/RandomX" target="_blank" rel="noopener">RandomX</a> for proof-of-work — the
+        same CPU-friendly, ASIC-resistant algorithm Monero uses. The block
+        identity hash stays SHA-256d (so block-index keys, RPC, and
+        mempool all keep working), but the difficulty target is checked
+        against the RandomX hash of the serialized header.
+      </p>
+
+      <h3>Why RandomX</h3>
+      <ul class="bullet-list">
+        <li><strong>CPU-friendly.</strong> Designed to run efficiently on commodity x86 CPUs. Anyone with a laptop can participate.</li>
+        <li><strong>ASIC-resistant.</strong> Random program execution + 2 GB dataset means a custom chip would basically be a CPU.</li>
+        <li><strong>2048-block epoch rotation</strong> with 64-block lag. Seed for an epoch derives from the hash of a fixed past block, so miners can't precompute it indefinitely.</li>
+      </ul>
+
+      <h3>Mine on regtest</h3>
+      <pre><code># Build (depends-static, recommended for portability)
+cd depends &amp;&amp; make HOST=x86_64-pc-linux-gnu NO_QR=1
+cd ..
+cmake -S . -B build \
+    --toolchain depends/x86_64-pc-linux-gnu/toolchain.cmake \
+    -DBUILD_GUI=ON -DWITH_QRENCODE=OFF
+cmake --build build -j
+
+# Start a regtest daemon
+build/bin/pricoind -regtest -datadir=/tmp/pricoin -daemon
+
+# Mine 110 blocks to your transparent wallet (coinbase maturity = 100)
+CLI="build/bin/pricoin-cli -regtest -datadir=/tmp/pricoin"
+$CLI createwallet alice
+ALICE=$($CLI -rpcwallet=alice getnewaddress "" bech32)
+$CLI generatetoaddress 110 "$ALICE"
+
+# Send a confidential transaction
+$CLI createwallet bob
+BOB=$($CLI -rpcwallet=bob pricoin_getstealthaddress | jq -r .address)
+$CLI -rpcwallet=alice walletsendct "$BOB" 25.0 0.0001
+$CLI generatetoaddress 1 "$ALICE"
+
+# bob recovers the value via stealth scan
+$CLI -rpcwallet=bob pricoin_listownct 0
+</code></pre>
+
+      <h3>Mainnet difficulty &amp; ramp-up</h3>
+      <p>
+        The mainnet genesis is mined at the lowest possible RandomX
+        difficulty target (<code>0x207fffff</code>). Post-genesis, Bitcoin's
+        standard difficulty adjustment algorithm (DAA) kicks in: re-target
+        every <code>2016</code> blocks (about 3.5 days at 150 s/block) so
+        average inter-block time tracks the network hashrate.
+      </p>
+    </div>
+  </section>
+
+  <section id="links" class="section">
+    <div class="container">
+      <h2>Links &amp; resources</h2>
+      <ul class="link-grid">
+        <li><a href="https://github.com/pricoinfoundation/pricoin" target="_blank" rel="noopener">Source code on GitHub</a></li>
+        <li><a href="https://github.com/pricoinfoundation/pricoin/releases" target="_blank" rel="noopener">Release downloads</a> — Linux x86_64, Windows x86_64, macOS arm64 / x86_64</li>
+        <li><a href="https://github.com/pricoinfoundation/pricoin/blob/main/doc/build-pricoin.md" target="_blank" rel="noopener">Build &amp; quick-start guide</a></li>
+        <li><a href="https://github.com/pricoinfoundation/pricoin/blob/main/README.md" target="_blank" rel="noopener">README</a></li>
+        <li><a href="https://github.com/tevador/RandomX" target="_blank" rel="noopener">RandomX</a> (vendored)</li>
+        <li><a href="https://github.com/BlockstreamResearch/secp256k1-zkp" target="_blank" rel="noopener">libsecp256k1-zkp</a> (vendored)</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <img class="brand-mark" src="pricoinlogo-64.png" alt="" width="28" height="28">
+      <span class="brand-name">Pricoin</span>
+      <span class="footer-subtitle">Privacy-mandatory cryptocurrency · MIT License</span>
+    </div>
+    <div class="footer-disclaimer">
+      Pricoin is an experimental, educational project. The code is provided
+      as-is, with no warranty. Privacy guarantees depend on correct
+      cryptographic implementation, which has not been independently
+      audited.
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
