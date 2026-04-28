@@ -43,7 +43,7 @@
   <section class="hero">
     <div class="container hero-grid">
       <div class="hero-text">
-      <div class="status-badge">Experimental · Educational fork · v0.1.0</div>
+      <div class="status-badge">Experimental · Educational fork · v0.1.8</div>
       <h1>Privacy is not a setting.<br>It's the only setting.</h1>
       <p class="lede">
         Pricoin (PRIC) is a Bitcoin Core fork where <strong>every non-coinbase
@@ -353,33 +353,42 @@
         <li><strong>2048-block epoch rotation</strong> with 64-block lag. Seed for an epoch derives from the hash of a fixed past block, so miners can't precompute it indefinitely.</li>
       </ul>
 
-      <h3>Mine on regtest</h3>
-      <pre><code># Build (depends-static, recommended for portability)
-cd depends &amp;&amp; make HOST=x86_64-pc-linux-gnu NO_QR=1
-cd ..
-cmake -S . -B build \
-    --toolchain depends/x86_64-pc-linux-gnu/toolchain.cmake \
-    -DBUILD_GUI=ON -DWITH_QRENCODE=OFF
-cmake --build build -j
+      <h3>Mine via the pool</h3>
+      <p>
+        Easiest path: point a Pricoin-aware miner at
+        <a href="https://pool.pricoin.org/">pool.pricoin.org</a>
+        with your stealth address as the username. Payouts arrive
+        directly as confidential outputs in your wallet — no
+        registration or login.
+      </p>
+      <pre><code># Get a stealth address from your wallet:
+pricoin-cli -rpcwallet=YOURWALLET pricoin_getstealthaddress
+# → {"address": "H6..."}
 
-# Start a regtest daemon
-build/bin/pricoind -regtest -datadir=/tmp/pricoin -daemon
+# Mine with the Pricoin xmrig fork (rx/pric):
+pricoin-miner \
+    --algo=rx/pric \
+    --url=stratum.pricoin.org:3333 \
+    --user=H6...your-stealth-address \
+    --pass=x \
+    --keepalive
 
-# Mine 110 blocks to your transparent wallet (coinbase maturity = 100)
-CLI="build/bin/pricoin-cli -regtest -datadir=/tmp/pricoin"
-$CLI createwallet alice
-ALICE=$($CLI -rpcwallet=alice getnewaddress "" bech32)
-$CLI generatetoaddress 110 "$ALICE"
-
-# Send a confidential transaction
-$CLI createwallet bob
-BOB=$($CLI -rpcwallet=bob pricoin_getstealthaddress | jq -r .address)
-$CLI -rpcwallet=alice walletsendct "$BOB" 25.0 0.0001
-$CLI generatetoaddress 1 "$ALICE"
-
-# bob recovers the value via stealth scan
-$CLI -rpcwallet=bob pricoin_listownct 0
+# Pool stats + worker lookup:
+#   https://pool.pricoin.org/
+#   https://pool.pricoin.org/worker/H6...your-stealth-address
 </code></pre>
+      <p class="mute">
+        Hardware-mode RandomX needs ~2 GB of RAM and benefits a lot
+        from kernel hugepages —
+        <code>sudo sysctl -w vm.nr_hugepages=1280</code>
+        is the recommended host-side tweak.
+      </p>
+      <p>
+        Solo mining still works the standard Bitcoin Core way
+        (<code>getblocktemplate</code> + your own miner), but with
+        any non-trivial network hashrate the pool is the practical
+        path to consistent payouts.
+      </p>
 
       <h3>Mainnet difficulty &amp; ramp-up</h3>
       <p>
