@@ -28,10 +28,10 @@
       <a href="#what">What is Pricoin?</a>
       <a href="#different">Different</a>
       <a href="#monero">vs Monero</a>
-      <a href="#zcash">vs Zcash</a>
-      <a href="#particl">vs Particl</a>
+      <a href="#swaps">Swaps</a>
       <a href="#coinomics">Coinomics</a>
       <a href="#mining">Mining</a>
+      <a href="whitepaper.html">Whitepaper</a>
       <a href="https://explorer.pricoin.io/">Explorer</a>
       <a class="github" href="https://github.com/pricoinfoundation/pricoin" target="_blank" rel="noopener">GitHub →</a>
     </nav>
@@ -103,10 +103,11 @@
       </div>
 
       <div class="warning">
-        <strong>Status:</strong> experimental / educational. This is a toy
-        implementation of a real privacy stack. Bugs in confidential
-        transactions or ring signatures break privacy <em>silently</em>
-        without breaking consensus. Do not use this code with real money.
+        <strong>Status:</strong> experimental / educational. Pricoin is a
+        from-scratch implementation of a real privacy stack. Bugs in
+        confidential transactions or ring signatures break privacy
+        <em>silently</em> without breaking consensus. Do not use this
+        code with real money.
       </div>
     </div>
   </section>
@@ -135,6 +136,7 @@
           <tr><td>Proof of work</td><td>SHA-256d (ASIC)</td><td>RandomX (CPU-friendly, 2048-block epoch rotation)</td></tr>
           <tr><td>Pruning</td><td>Supported</td><td>Disabled (v4 outputs are append-only ring decoys)</td></tr>
           <tr><td>Address HRP</td><td><code>bc</code> / <code>tb</code> / <code>bcrt</code></td><td><code>pric</code> / <code>tpric</code> / <code>pricrt</code></td></tr>
+          <tr><td>Cross-chain swaps</td><td>Lightning / submarine swaps to other chains</td><td>Trustless atomic swaps with BTC and LTC, built into the wallet</td></tr>
         </tbody>
       </table>
 
@@ -170,6 +172,7 @@
           <tr><td>PoW</td><td>RandomX (vendored from <code>tevador/RandomX</code>)</td><td>RandomX (with epoch rotation)</td></tr>
           <tr><td>Emission</td><td>Bitcoin-style halving every 840k blocks, 21 M cap</td><td>Smooth + tail emission, ~18.4 M soft cap</td></tr>
           <tr><td>Block time</td><td>150 s</td><td>120 s</td></tr>
+          <tr><td>Native atomic swaps</td><td>Yes — BTC and LTC, no third party, in-wallet</td><td>Atomic swaps exist (e.g. COMIT, farcaster-project) but require external tooling</td></tr>
         </tbody>
       </table>
 
@@ -273,6 +276,84 @@
         (regulatory reporting, exchange deposits, etc.). The trade-off is
         that the privacy guarantee for individual users is weaker than
         what a mandatory-privacy chain provides.
+      </p>
+    </div>
+  </section>
+
+  <section id="swaps" class="section alt">
+    <div class="container">
+      <h2>Cross-chain atomic swaps</h2>
+      <p>
+        Pricoin ships a built-in atomic-swap protocol so users can move
+        between PRIC and Bitcoin or Litecoin <strong>without a custodian,
+        exchange listing, or third-party bridge</strong>. Both legs are
+        bound by a single elliptic-curve point <code>T<sub>G</sub></code>:
+        either both transactions confirm or both refund — never one
+        without the other.
+      </p>
+
+      <div class="cards">
+        <div class="card">
+          <div class="card-icon">↔</div>
+          <h3>BTC ↔ PRIC</h3>
+          <p>
+            Schnorr-adaptor over MuSig2 on a P2TR (Taproot) 2-of-2 output.
+            The Bitcoin leg is indistinguishable on-chain from a normal
+            Taproot key-path spend — no script reveal, no hash-lock
+            footprint.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">↔</div>
+          <h3>LTC ↔ PRIC</h3>
+          <p>
+            Discrete-log-bound HTLC: a P2WSH script that is unlocked by
+            knowledge of <em>t</em> such that <em>t·G&nbsp;=&nbsp;T<sub>G</sub></em>,
+            not by a SHA-256 preimage. Same atomicity guarantee as the
+            BTC swap, on a chain that doesn't yet have Taproot.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">⚙</div>
+          <h3>Adaptor-CLSAG on the PRIC leg</h3>
+          <p>
+            On the Pricoin side the funding output is a joint stealth
+            address (cooperative dual-key) and the spending signature is
+            an adaptor-CLSAG. The PRIC claim transaction publishes
+            <em>t</em> on the Pricoin chain; the counterparty extracts
+            it and uses it to claim the foreign leg.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">⌖</div>
+          <h3>Discovery via Nostr</h3>
+          <p>
+            The wallet has an integrated orderbook over a Nostr relay
+            mesh. Offers, matches, DMs, and ACKs all flow through
+            relays — no central server, no KYC, no account creation.
+            Run your own relay or use the four public ones bundled
+            with the client.
+          </p>
+        </div>
+      </div>
+
+      <p class="note">
+        Refund timelocks protect both parties if the counterparty
+        disappears. The wallet drives the entire flow end-to-end: hold
+        BTC/LTC in a built-in holding wallet, post or take an offer,
+        match, fund, claim, and refund — all from the GUI, with no
+        manual scripting.
+      </p>
+
+      <p>
+        For the cryptographic specification (DLEQ proofs, joint-key
+        proof-of-possession, refund safety, cooperative-CLSAG nonce
+        protocol) see the
+        <a href="whitepaper.html">whitepaper</a> §11 (BTC swap) and
+        §12 (LTC swap).
       </p>
     </div>
   </section>
@@ -405,6 +486,7 @@ pricoin-miner \
     <div class="container">
       <h2>Links &amp; resources</h2>
       <ul class="link-grid">
+        <li><a href="whitepaper.html">Whitepaper (HTML)</a> · <a href="whitepaper.pdf" download>PDF</a> — protocol specification: confidential amounts, CLSAG, adaptor-CLSAG, atomic swaps, RandomX</li>
         <li><a href="https://explorer.pricoin.io/">Block explorer</a> — live view of blocks, transactions, key images, and circulating supply</li>
         <li><a href="https://github.com/pricoinfoundation/pricoin" target="_blank" rel="noopener">Source code on GitHub</a></li>
         <li><a href="https://github.com/pricoinfoundation/pricoin/releases" target="_blank" rel="noopener">Release downloads</a> — Linux x86_64, Windows x86_64, macOS arm64 / x86_64</li>

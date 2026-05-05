@@ -1,0 +1,1300 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pricoin Whitepaper — Privacy-by-default cryptocurrency</title>
+  <meta name="description" content="Pricoin (PRIC) technical whitepaper — confidential amounts, stealth addresses, CLSAG ring signatures, adaptor-CLSAG, cross-chain atomic swaps, RandomX with epoch rotation.">
+  <meta name="theme-color" content="#fdfcf9">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+  <link rel="apple-touch-icon" sizes="200x200" href="pricoinlogo-200.png">
+
+  <style>
+    /* Whitepaper-only tweaks: numbered sections, tighter paragraphs,
+       margin notes, a TOC sidebar that collapses on small screens. */
+    .wp-meta {
+      color: var(--text-soft);
+      font-size: 0.95em;
+      margin: -8px 0 28px;
+    }
+    .wp-meta code { background: transparent; padding: 0; }
+    .wp-toc {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin: 24px 0 36px;
+    }
+    .wp-toc h3 {
+      margin: 0 0 10px;
+      font-size: 0.92em;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-soft);
+    }
+    .wp-toc ol {
+      margin: 0;
+      padding-left: 22px;
+      columns: 2;
+      column-gap: 36px;
+    }
+    .wp-toc li { break-inside: avoid; line-height: 1.55; }
+    .wp-toc a { border: 0; }
+    @media (max-width: 640px) {
+      .wp-toc ol { columns: 1; }
+    }
+
+    .section.wp-section h2 {
+      counter-increment: wp-h2;
+      scroll-margin-top: 80px;
+    }
+    .section.wp-section h2::before {
+      content: counter(wp-h2) ". ";
+      color: var(--text-soft);
+      font-weight: 500;
+    }
+    .section.wp-section h3 {
+      scroll-margin-top: 80px;
+    }
+    body { counter-reset: wp-h2; }
+
+    .formula {
+      background: var(--code-bg);
+      border-left: 3px solid var(--accent);
+      padding: 12px 18px;
+      margin: 14px 0;
+      font-family: var(--font-mono);
+      font-size: 0.95em;
+      overflow-x: auto;
+    }
+    .figure-cap {
+      color: var(--text-soft);
+      font-size: 0.92em;
+      font-style: italic;
+      margin-top: -8px;
+    }
+
+    .footnote {
+      font-size: 0.92em;
+      color: var(--text-soft);
+      border-top: 1px solid var(--border);
+      padding-top: 18px;
+      margin-top: 32px;
+    }
+    .footnote ol { padding-left: 20px; }
+    .footnote li { margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" href="index.html#top">
+      <img class="brand-mark" src="pricoinlogo-64.png" alt="" width="32" height="32">
+      <span class="brand-name">Pricoin</span>
+    </a>
+    <nav class="topnav">
+      <a href="index.html#what">Overview</a>
+      <a href="index.html#different">Different</a>
+      <a href="index.html#monero">vs Monero</a>
+      <a href="whitepaper.html" aria-current="page">Whitepaper</a>
+      <a class="github" href="https://github.com/pricoinfoundation/pricoin">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="section">
+  <div class="container">
+    <h1 style="margin-top: 0; font-size: clamp(28px, 4vw, 44px); line-height: 1.18;">
+      Pricoin: A privacy-by-default cryptocurrency
+    </h1>
+    <p class="wp-meta">
+      Whitepaper, version 1 · 2026 · The Pricoin developers ·
+      <a href="https://github.com/pricoinfoundation/pricoin">github.com/pricoinfoundation/pricoin</a>
+    </p>
+
+    <p>
+      <strong>Abstract.</strong>
+      Pricoin (ticker <code>PRIC</code>) is a Bitcoin Core fork in which
+      every non-coinbase transaction is private at the consensus layer.
+      Amounts are hidden by Pedersen commitments with rangeproofs;
+      recipients are hidden by dual-key stealth addresses producing a
+      fresh one-time output key per payment; senders are hidden by
+      multi-layer CLSAG ring signatures with a fixed ring size of 16,
+      paired with key images for double-spend prevention. The chain
+      uses RandomX proof-of-work on a Monero-style 2048-block epoch
+      seed rotation, a 150-second target block time, and an 840 000-
+      block halving interval. Coinbase outputs remain transparent so
+      the emission curve is auditable. Cross-chain atomic swaps with
+      Bitcoin and Litecoin are supported natively via two parallel
+      adaptor-signature protocols — Schnorr-adaptor / MuSig2 over
+      P2TR for Taproot chains, and a discrete-log-bound HTLC for
+      non-Taproot chains — both binding the foreign-leg secret to
+      Pricoin's adaptor-CLSAG via the same elliptic-curve point
+      <code>T<sub>G</sub></code>.
+    </p>
+
+    <p>
+      This document is the technical specification of the protocol.
+      For an overview aimed at non-cryptographers, see the
+      <a href="index.html">Pricoin homepage</a>. A printable
+      <a href="whitepaper.pdf" download>PDF version</a> of this
+      whitepaper is also available.
+    </p>
+
+    <div class="wp-toc">
+      <h3>Contents</h3>
+      <ol>
+        <li><a href="#intro">Introduction</a></li>
+        <li><a href="#design-goals">Design goals</a></li>
+        <li><a href="#ct">Confidential amounts</a></li>
+        <li><a href="#stealth">Stealth addresses</a></li>
+        <li><a href="#clsag">CLSAG ring signatures</a></li>
+        <li><a href="#joint">Cooperative (joint) signing</a></li>
+        <li><a href="#adaptor">Adaptor-CLSAG</a></li>
+        <li><a href="#tx-format">Transaction format (v4)</a></li>
+        <li><a href="#consensus">Consensus &amp; PoW</a></li>
+        <li><a href="#emission">Emission &amp; supply</a></li>
+        <li><a href="#swap-btc">BTC↔PRIC atomic swap</a></li>
+        <li><a href="#swap-ltc">LTC↔PRIC atomic swap</a></li>
+        <li><a href="#discovery">Discovery via Nostr</a></li>
+        <li><a href="#wallet">Wallet architecture</a></li>
+        <li><a href="#mining">Mining &amp; pools</a></li>
+        <li><a href="#threats">Threat model</a></li>
+        <li><a href="#limitations">Known limitations</a></li>
+        <li><a href="#future">Future work</a></li>
+        <li><a href="#refs">References</a></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section class="section wp-section">
+  <div class="container">
+    <h2 id="intro">Introduction</h2>
+    <p>
+      Bitcoin's privacy properties degrade in two well-known ways. The
+      transparent UTXO graph allows chain analysis to cluster
+      addresses; and even when sophisticated users employ CoinJoin or
+      similar mixing tools, the privacy gain is opt-in and benefits
+      only those who can afford the friction. Honest users who pay no
+      attention to coin selection routinely leak their transaction
+      graph, balances, and counterparties to anyone running an
+      indexer.
+    </p>
+    <p>
+      Several projects address this with privacy-by-default
+      architectures — most notably Monero (CryptoNote/RingCT) and
+      Zcash (zk-SNARKs). Pricoin sits between them: it inherits
+      Bitcoin Core's codebase and operational maturity, replaces the
+      transparent transaction format with a confidential-transactions
+      bundle, and adopts the cryptographic primitives Monero has
+      hardened over a decade — Pedersen commitments, stealth
+      addresses, CLSAG ring signatures — but reuses Bitcoin's
+      libsecp256k1 curve, RPC surface, P2P stack, and software-
+      engineering practices. The result is a chain where every spend
+      hides amount, recipient, and (probabilistically) sender, while
+      the codebase remains close enough to Bitcoin Core that fixes
+      and improvements upstream can be cherry-picked.
+    </p>
+    <p>
+      Pricoin additionally introduces native atomic swaps with
+      Bitcoin and Litecoin via adaptor-signature protocols. The
+      cross-chain binding is the same 33-byte compressed elliptic-
+      curve point <code>T<sub>G</sub> = t·G</code> on both sides;
+      revealing <code>t</code> on either chain unlocks the
+      counterparty leg on the other. No trusted bridges, no wrapped
+      tokens, no escrows.
+    </p>
+
+    <h2 id="design-goals">Design goals</h2>
+    <ul>
+      <li>
+        <strong>Privacy is mandatory, not optional.</strong> Spending
+        a transparent input via the v1/v2/v3 paths returns
+        <code>bad-non-pct-non-coinbase</code> at validation. There
+        is no mode in which a Pricoin send leaks amount or recipient.
+      </li>
+      <li>
+        <strong>Auditable emission.</strong> Coinbase outputs remain
+        transparent (mining rewards are visible on chain). Total
+        supply at any height is computable without scanning private
+        outputs.
+      </li>
+      <li>
+        <strong>Bitcoin Core lineage.</strong> Reuse the existing
+        node software, P2P protocol, RPC surface, wallet architecture,
+        and engineering process. Diverge only where privacy requires.
+      </li>
+      <li>
+        <strong>Native cross-chain interop.</strong> Atomic swaps
+        with BTC and LTC, no bridges. Same secret <code>t</code>
+        binds both legs cryptographically.
+      </li>
+      <li>
+        <strong>Privacy-preserving discovery.</strong> Order
+        broadcast and peer-to-peer messaging happen over Nostr
+        relays under the user's control. No centralized matching
+        engine.
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section class="section alt wp-section">
+  <div class="container">
+    <h2 id="ct">Confidential amounts</h2>
+    <p>
+      Pricoin replaces transparent <code>nValue</code> outputs with
+      <em>Pedersen commitments</em>. A commitment to value
+      <code>v</code> with blinding factor <code>r</code> is a curve
+      point
+    </p>
+    <div class="formula">
+      C(v, r) = v · H + r · G
+    </div>
+    <p>
+      where <code>G</code> is the standard secp256k1 generator and
+      <code>H</code> is a second generator with no known discrete-log
+      relation to <code>G</code> (a "nothing-up-my-sleeve" point
+      derived from <code>SHA256(G)</code> hashed to the curve).
+      Commitments are homomorphic — addition of commitments equals
+      commitment of summed plaintext values:
+    </p>
+    <div class="formula">
+      C(v<sub>1</sub>, r<sub>1</sub>) + C(v<sub>2</sub>, r<sub>2</sub>) = C(v<sub>1</sub>+v<sub>2</sub>, r<sub>1</sub>+r<sub>2</sub>)
+    </div>
+    <p>
+      so a transaction's balance equation
+      <code>Σ inputs − Σ outputs − fee = 0</code> can be verified
+      under Pedersen commitments without revealing any individual
+      amount, by checking that the sum of input commitments minus the
+      sum of output commitments minus a transparent <code>fee · H</code>
+      term commits to zero.
+    </p>
+
+    <h3>Rangeproofs</h3>
+    <p>
+      Pedersen commitments alone don't prevent a malicious sender
+      from creating an output that "commits" to a negative value
+      (which mod the group order looks identical to a positive
+      value, but would inflate supply). Pricoin attaches a Borromean
+      <em>rangeproof</em> to each output, proving that the committed
+      value lies in
+      <code>[0, 2<sup>64</sup>)</code> without revealing it.
+      Rangeproofs are ~1 280 bytes per output for the current
+      Borromean construction (libsecp256k1-zkp's <code>rangeproof</code>
+      module). Bulletproofs+ (BPP) adoption is on the roadmap and
+      would cut this to ~100 bytes per output, but is gated on
+      external review of the implementation in the secp256k1-zkp
+      fork.
+    </p>
+
+    <h3>Encrypted amount + blinding</h3>
+    <p>
+      The recipient needs to recover both the value <code>v</code>
+      and blinding <code>r</code> to spend the output. Pricoin
+      encrypts these as part of the rangeproof, keyed by an ECDH
+      shared secret derived from the sender's per-tx ephemeral
+      keypair and the recipient's view key. Recovery is performed
+      by attempting <em>rangeproof rewind</em> on each candidate
+      output — a roughly constant-time operation that fails (cheaply)
+      for outputs not addressed to the scanner.
+    </p>
+
+    <h2 id="stealth">Stealth addresses</h2>
+    <p>
+      A Pricoin recipient is identified by a <em>stealth address</em>
+      — a pair of public keys
+      <code>(A, B)</code> where <code>A = a·G</code> is the recipient's
+      <em>view key</em> and <code>B = b·G</code> is their
+      <em>spend key</em>. The address itself is reusable; revealing
+      it does not link payments together.
+    </p>
+    <p>
+      For each output paying the address, the sender picks a fresh
+      ephemeral scalar <code>r</code>, publishes
+      <code>R = r·G</code> in the transaction, and computes a
+      one-time output key
+    </p>
+    <div class="formula">
+      P = H<sub>s</sub>(r·A ‖ index) · G + B
+    </div>
+    <p>
+      where <code>H<sub>s</sub></code> is a domain-separated hash to
+      a scalar, <code>·A</code> is point multiplication of <code>A</code>
+      by <code>r</code>, and <code>index</code> is the output's
+      position in the transaction's vout array. The output's
+      scriptPubKey commits to <code>P</code>; on chain, every output
+      to the recipient looks like a fresh, unrelated key.
+    </p>
+    <p>
+      Recipient scan: for each transaction, the recipient computes
+      <code>S = a·R</code> using their view key, derives the same
+      <code>H<sub>s</sub>(S ‖ index)</code> shared secret, and
+      checks whether the resulting one-time pubkey matches any
+      output's scriptPubKey. On match, the spend key is
+    </p>
+    <div class="formula">
+      p = H<sub>s</sub>(S ‖ index) + b   (mod n)
+    </div>
+    <p>
+      Only the holder of <code>b</code> can derive <code>p</code>;
+      the view key alone is sufficient to recognize incoming
+      payments but not to spend them.
+    </p>
+
+    <p>
+      The construction is the CryptoNote dual-key scheme as deployed
+      by Monero. Pricoin's wallet uses a Bitcoin-style stealth
+      address encoding (Base58Check, version byte <code>0x53</code>)
+      with a 67-byte payload (<code>A ‖ B ‖ checksum bits</code>).
+      Addresses begin with <code>H6</code>.
+    </p>
+  </div>
+</section>
+
+<section class="section wp-section">
+  <div class="container">
+    <h2 id="clsag">CLSAG ring signatures</h2>
+    <p>
+      A <em>ring signature</em> hides which member of an N-element
+      pubkey set produced a signature, while still proving that one of
+      them did. Pricoin uses CLSAG (Compact Linkable Spontaneous
+      Anonymous Group signatures) — the same construction Monero
+      adopted in 2020. Ring size is fixed at <strong>16</strong> in
+      consensus; variable ring sizes leak fingerprints across
+      transactions and are forbidden.
+    </p>
+
+    <h3>Single-layer CLSAG</h3>
+    <p>
+      Given a ring of <code>N=16</code> public keys
+      <code>{P<sub>0</sub>, …, P<sub>15</sub>}</code> with the real
+      signer at index <code>π</code>, single-layer CLSAG produces a
+      signature <code>(c<sub>0</sub>, s<sub>0</sub>, …, s<sub>15</sub>, KI)</code>
+      where <code>KI = x<sub>π</sub> · H<sub>p</sub>(P<sub>π</sub>)</code>
+      is the <em>key image</em> — a deterministic fingerprint of the
+      real signer's private key, which is checked against the global
+      key-image set for double-spend prevention.
+    </p>
+    <p>
+      Verification walks the ring:
+    </p>
+    <div class="formula">
+      L<sub>i</sub> = s<sub>i</sub>·G + c<sub>i</sub>·P<sub>i</sub>
+      <br>R<sub>i</sub> = s<sub>i</sub>·H<sub>p</sub>(P<sub>i</sub>) + c<sub>i</sub>·KI
+      <br>c<sub>i+1</sub> = H<sub>s</sub>(L<sub>i</sub> ‖ R<sub>i</sub> ‖ msg ‖ ring)
+    </div>
+    <p>
+      and accepts iff <code>c<sub>0</sub></code> equals the value
+      derived after wrapping around the ring. Each non-signer's
+      <code>s<sub>i</sub></code> is freshly random; the signer's
+      <code>s<sub>π</sub></code> is computed so the equations close.
+    </p>
+
+    <h3>Multi-layer CLSAG (RingCT)</h3>
+    <p>
+      For confidential-amount inputs, the ring members are pairs
+      <code>(P<sub>i</sub>, W<sub>i</sub>)</code> where
+      <code>W<sub>i</sub> = C<sub>i</sub> − C<sub>pseudo</sub></code>
+      is the difference between the candidate's amount commitment and
+      a sender-chosen pseudo-commitment. The signer's private witness
+      is <code>(x<sub>π</sub>, z<sub>π</sub>)</code> where
+      <code>z<sub>π</sub> = blind<sub>π</sub> − blind<sub>pseudo</sub></code>.
+    </p>
+    <p>
+      Pricoin's multi-layer CLSAG follows the standard Monero
+      construction: <em>tx-invariant</em> key images
+      (<code>KI = x<sub>π</sub>·H<sub>p</sub>(P<sub>π</sub>)</code>)
+      and a separate commitment image
+      <code>D = z<sub>π</sub>·H<sub>p</sub>(P<sub>π</sub>)</code>.
+      Aggregation factors <code>μ<sub>P</sub>, μ<sub>C</sub></code> bind
+      the ring walk to <code>(ring, KI, D)</code>. Tx-invariant key
+      images mean the same input signed under different pseudo-
+      commitments produces the same KI, so double-spend prevention
+      works across re-broadcasts. (An earlier draft used tx-dependent
+      key images; this was a soundness gap and is no longer used.)
+    </p>
+
+    <h3>Decoy selection</h3>
+    <p>
+      Decoy quality determines the actual privacy gain — a ring
+      where 15 of 16 members are obviously not the spender provides
+      effectively no privacy. Pricoin uses Monero's gamma
+      distribution over recent outputs as the decoy-selection
+      function, drawing from outputs of compatible amount commitment
+      and age. The full distribution is published with the wallet
+      so it can be re-sampled by external auditors.
+    </p>
+
+    <h2 id="joint">Cooperative (joint) signing</h2>
+    <p>
+      Atomic swaps require <em>cooperative</em> signing: two parties
+      jointly produce a signature under a sum-aggregated pubkey
+      <code>P<sub>π</sub> = X<sub>A</sub> + X<sub>B</sub></code>,
+      where neither holds <code>x<sub>π</sub> = x<sub>A</sub> +
+      x<sub>B</sub></code> alone. Pricoin's joint CLSAG is a
+      three-round protocol over a one-of-N ring containing the
+      joint pubkey at the signer index:
+    </p>
+    <ol>
+      <li>
+        <strong>Round 1 — nonce gen.</strong> Each party samples
+        <code>r<sub>i</sub></code> and broadcasts
+        <code>L<sub>i</sub><sup>share</sup></code>,
+        <code>R<sub>i</sub><sup>share</sup></code>,
+        <code>KI<sub>i</sub><sup>share</sup></code>, plus a
+        commitment to a Schnorr DLEQ proof.
+      </li>
+      <li>
+        <strong>Round 2 — combine.</strong> Either party sums the
+        shares, derives the standard CLSAG <code>c<sub>π</sub></code>,
+        and broadcasts the per-party <code>s<sub>j</sub></code>
+        for non-signer ring members and the partial
+        <code>s<sub>π</sub><sup>share</sup></code>.
+      </li>
+      <li>
+        <strong>Round 3 — assemble.</strong> Each party computes
+        their final <code>s<sub>π</sub><sup>share</sup></code>
+        contribution, broadcasts; the aggregator sums into a
+        complete CLSAG signature.
+      </li>
+    </ol>
+    <p>
+      The protocol is implemented in
+      <code>src/pricoin/joint_ringsig.{h,cpp}</code> for both
+      single-layer and multi-layer rings. Self-tests at daemon
+      startup exercise the full flow end-to-end against fresh
+      randomness.
+    </p>
+    <p>
+      <strong>Rogue-key defense.</strong> Plain key aggregation is
+      vulnerable to a rogue-key attack — a malicious party can
+      choose <code>X<sub>B</sub></code> as a function of
+      <code>X<sub>A</sub></code> to produce a joint pubkey for which
+      they alone control the discrete log. Pricoin defends by
+      requiring each party to attach a <em>proof of possession</em>
+      (a Schnorr signature over a domain-separated tag with
+      their pubkey) before accepting a joint pubkey. The PoP scheme
+      is in <code>src/pricoin/joint_stealth.{h,cpp}</code>.
+    </p>
+
+    <h2 id="adaptor">Adaptor-CLSAG</h2>
+    <p>
+      Adaptor signatures are the cryptographic primitive that makes
+      atomic swaps work. Adaptor-CLSAG extends the standard CLSAG
+      construction with an additional point <code>T<sub>G</sub> = t·G</code>
+      such that the signer can produce a <em>pre-signature</em> that
+      verifies under the adaptor but is not a valid CLSAG until
+      adapted with the secret <code>t</code>. Specifically:
+    </p>
+    <ul>
+      <li>
+        <code>T<sub>G</sub></code> — the public adaptor point on the
+        standard generator <code>G</code>. Same byte representation
+        as Bitcoin's compressed pubkey format; reused as-is on the
+        cross-chain leg.
+      </li>
+      <li>
+        <code>T<sub>H</sub> = t · H<sub>p</sub>(P<sub>π</sub>)</code>
+        — the adaptor point on the per-output generator
+        <code>H<sub>p</sub>(P<sub>π</sub>)</code>. Required because
+        CLSAG operates on two parallel generators.
+      </li>
+      <li>
+        A DLEQ proof binding <code>T<sub>G</sub></code> to
+        <code>T<sub>H</sub></code> via the same scalar
+        <code>t</code>.
+      </li>
+    </ul>
+    <p>
+      The pre-signature is a CLSAG-shaped tuple where the signer's
+      <code>L<sub>π</sub>, R<sub>π</sub></code> equations are
+      satisfied modulo addition of <code>T<sub>G</sub></code> and
+      <code>T<sub>H</sub></code>. <em>Adapt</em>(presig, t) =
+      valid CLSAG. <em>Extract</em>(presig, signed_tx_sig) =
+      <code>t</code>.
+    </p>
+    <p>
+      Cross-chain flow: the swap counterparty publishes the adapted
+      signature on the PRIC chain to claim funds; the original
+      signer extracts <code>t</code> from the on-chain CLSAG, then
+      uses <code>t</code> to claim the foreign-chain leg whose
+      script binds to <code>T<sub>G</sub></code>. Atomicity is
+      cryptographic: anyone who can publish on one chain reveals
+      <code>t</code>, which immediately unlocks the other.
+    </p>
+    <p>
+      The construction is in
+      <code>src/pricoin/adaptor_ringsig.{h,cpp}</code> and its
+      cooperative-signing wrapper in
+      <code>src/pricoin/adaptor_joint_ringsig.{h,cpp}</code>. Both
+      are exercised by the startup self-test gauntlet.
+    </p>
+  </div>
+</section>
+
+<section class="section alt wp-section">
+  <div class="container">
+    <h2 id="tx-format">Transaction format (v4)</h2>
+    <p>
+      Pricoin defines transaction version <code>4</code>
+      (<code>PRICOIN_CT_VERSION</code>) for confidential transactions.
+      v1/v2/v3 spends — the entire Bitcoin transparent transaction
+      family — are rejected for non-coinbase txs at consensus
+      (<code>bad-non-pct-non-coinbase</code>). Only v4 is mineable
+      on the PRIC chain, except for coinbases which remain v1.
+    </p>
+
+    <p>A v4 transaction extends Bitcoin's <code>CTransaction</code> with a single <code>ct_bundle</code> structure:</p>
+<pre><code>CTBundle {
+    input_commitments[]  : Pedersen commitments to input amounts
+                            (used in transparent-input mode for the
+                            coinbase → CT on-ramp)
+    ring_inputs[]        : RingCT inputs — N=16 candidate prevouts,
+                            pseudo_commitment, multi-layer CLSAG sig
+                            with key image
+    outputs[]            : (commitment, rangeproof, scriptPubKey,
+                            tx_pubkey, one_time_pubkey)
+    transparent_fee      : explicit fee output, satoshis
+}</code></pre>
+
+    <p>
+      The v4 sighash binds to the ct_bundle as a whole — any tampering
+      with commitments, rangeproofs, or ring data invalidates every
+      input signature.
+    </p>
+
+    <h3>UTXO model</h3>
+    <p>
+      Bitcoin's UTXO set is keyed by <code>(txid, vout)</code> with
+      "spent" tracked by removal from the set. Pricoin's ring inputs
+      reference 16 candidate prevouts, only one of which is the real
+      input — so the standard "remove the spent UTXO" semantics don't
+      apply. Pricoin replaces the UTXO set with two append-only
+      structures:
+    </p>
+    <ul>
+      <li>
+        <strong>Output set.</strong> Every v4 output is added on
+        confirmation and never removed, even after spending. Ring-
+        decoy lookups need indefinite history.
+      </li>
+      <li>
+        <strong>Key-image set.</strong> Every published key image is
+        added on confirmation. Validation rejects any tx whose key
+        image is already in the set (double-spend prevention).
+      </li>
+    </ul>
+    <p>
+      Pruning is incompatible with this model — a spent output is
+      still required as a potential decoy for future ring spends —
+      and is rejected at startup
+      (<code>-prune</code> returns <code>InitError</code>).
+    </p>
+  </div>
+</section>
+
+<section class="section wp-section">
+  <div class="container">
+    <h2 id="consensus">Consensus &amp; PoW</h2>
+
+    <h3>Proof of work — RandomX</h3>
+    <p>
+      Pricoin uses RandomX (vendored from
+      <a href="https://github.com/tevador/RandomX">tevador/RandomX</a>)
+      as its proof-of-work function. RandomX is memory-hard and
+      designed to make ASICs minimally advantageous, keeping mining
+      accessible to commodity CPUs. The hash function input is the
+      80-byte serialized block header; the seed for the RandomX
+      cache is rotated every <code>EPOCH_BLOCKS = 2048</code> blocks
+      with a <code>EPOCH_LAG = 64</code>-block delay so miners
+      can't precompute the next epoch too far ahead. The seed at
+      height <code>h</code> is the block hash at
+      <code>floor((h − lag) / 2048) · 2048</code>, with a fixed
+      bootstrap seed for the first epoch.
+    </p>
+    <p>
+      RandomX outputs are 256-bit; the chain's block-identity hash
+      is still <code>SHA-256d</code>(header) so block index keys
+      remain Bitcoin-shape. Only <code>CheckProofOfWork</code> calls
+      use the RandomX hash. Header validation across epoch
+      boundaries handles the case where the seed-block isn't yet
+      indexed during initial block download by deferring the PoW
+      check to full-block validation, where the seed block has
+      always been processed sequentially.
+    </p>
+
+    <h3>Block parameters</h3>
+    <ul>
+      <li><strong>Target block time:</strong> 150 seconds.</li>
+      <li><strong>Difficulty retarget:</strong> every 288 blocks (~12 hours), Bitcoin-style.</li>
+      <li><strong>Halving interval:</strong> 840 000 blocks (~4 years at target time).</li>
+      <li><strong>Block weight:</strong> raised from Bitcoin's 4 MWU to accommodate ~1 280-byte rangeproofs and ~600-byte ring sigs per output/input.</li>
+      <li><strong>Initial reward:</strong> 50 PRIC.</li>
+      <li><strong>Total supply:</strong> ~84 000 000 PRIC. Pricoin keeps Bitcoin's per-block reward (50 PRIC, halving every 840 000 blocks) but runs at 4× the block rate, so each era emits 4× as many coins as Bitcoin's corresponding era.</li>
+    </ul>
+
+    <h3>Genesis</h3>
+    <p>
+      Each network (mainnet, testnet, signet, regtest) has its own
+      RandomX-mined genesis block, distinct
+      <code>pszTimestamp</code>, and genesis hash (mainnet:
+      <code>24e422e08dde…06a827f</code>, mined 2026-04-29). Genesis
+      is bundled with the binary — no chain-history download is
+      required to start syncing from height 0.
+    </p>
+
+    <h2 id="emission">Emission &amp; supply</h2>
+    <p>
+      Pricoin reuses Bitcoin's per-block-reward formula and halving
+      interval but, because the block rate is 4× higher, the supply
+      cap and per-era emission are also 4× larger. Block reward at
+      height <code>h</code> is
+    </p>
+    <div class="formula">
+      reward(h) = 50 PRIC · 2<sup>−⌊h / 840000⌋</sup>
+    </div>
+    <p>
+      until the reward drops below one satoshi, after which it is
+      zero. Total supply asymptotically approaches
+      ~84 000 000 PRIC (era 0 alone emits 50 × 840 000 = 42 000 000
+      PRIC, and subsequent eras halve as in Bitcoin). Coinbase outputs
+      are <strong>transparent</strong>: amount visible, recipient
+      P2WPKH, scriptPubKey on chain. This makes the cumulative
+      emission auditable by inspection at any block height — a
+      property the confidential-spend privacy model would otherwise
+      lose.
+    </p>
+    <p>
+      The on-ramp from transparent coinbase → confidential is
+      handled by <code>walletsendct</code>: transparent input(s) are
+      consumed and the output is a v4 CT bundle. From that point on,
+      the value lives in confidential outputs and is spent through
+      RingCT. There is no path from a confidential output back to a
+      transparent one short of mining.
+    </p>
+  </div>
+</section>
+
+<section class="section alt wp-section">
+  <div class="container">
+    <h2 id="swap-btc">BTC↔PRIC atomic swap</h2>
+    <p>
+      Pricoin's BTC swap protocol uses MuSig2 + Schnorr-adaptor on
+      the BTC leg paired with cooperative adaptor-CLSAG on the PRIC
+      leg. The cross-chain binding is the same point
+      <code>T<sub>G</sub></code> on both sides. Both legs use
+      libsecp256k1's BIP340 / BIP341 paths so the BTC outputs are
+      indistinguishable from any other 2-of-2 P2TR.
+    </p>
+
+    <h3>Roles</h3>
+    <p>
+      We label the two parties by their role in the swap:
+      <strong>PRIC seller</strong> sells PRIC, buys BTC; locks PRIC
+      into a joint stealth output, eventually claims BTC by adapting
+      a pre-signed BTC claim transaction. <strong>PRIC buyer</strong>
+      picks the secret <code>t</code>, locks BTC into a 2-of-2
+      P2TR output, eventually claims PRIC by adapting a pre-signed
+      PRIC claim CLSAG.
+    </p>
+
+    <h3>Setup</h3>
+    <ol>
+      <li>
+        Parties exchange their swap-identity x-only pubkeys via
+        Nostr DM. The PRIC seller chooses an ephemeral
+        <code>r</code>; together they compute the joint stealth
+        address <code>(A<sub>A</sub>+A<sub>B</sub>, B<sub>A</sub>+B<sub>B</sub>)</code>
+        and the corresponding one-time pubkey <code>P<sub>π</sub></code>
+        for the PRIC funding output.
+      </li>
+      <li>
+        The PRIC buyer picks <code>t</code> uniformly at random,
+        computes <code>T<sub>G</sub> = t·G</code>,
+        <code>T<sub>H</sub> = t·H<sub>p</sub>(P<sub>π</sub>)</code>,
+        and a DLEQ proof binding the two. They send
+        <code>(T<sub>G</sub>, T<sub>H</sub>, π<sub>DLEQ</sub>)</code>
+        to the PRIC seller.
+      </li>
+      <li>
+        Both parties agree on refund timelocks
+        <code>(t<sub>BTC</sub>, t<sub>PRIC</sub>)</code> with
+        <code>t<sub>BTC</sub> &gt; t<sub>PRIC</sub> + Δ<sub>min</sub></code>,
+        where <code>Δ<sub>min</sub></code> is large enough for the
+        seller to extract <code>t</code> from a confirmed PRIC
+        claim and broadcast a BTC claim before the BTC refund
+        becomes spendable.
+      </li>
+    </ol>
+
+    <h3>Funding</h3>
+    <p>
+      The PRIC buyer funds the BTC leg as a 2-of-2 P2TR output
+      whose aggregate x-only pubkey is
+      <code>MuSig2.Aggregate(X<sub>A</sub>, X<sub>B</sub>)</code>.
+      The PRIC seller funds the PRIC leg by sending the agreed
+      amount to the joint stealth address using
+      <code>walletsendct</code> with the pre-agreed ephemeral
+      <code>r</code>, producing the joint output at
+      <code>P<sub>π</sub></code>.
+    </p>
+
+    <h3>Pre-signing</h3>
+    <p>
+      Before either funding tx broadcasts, both parties cooperatively
+      pre-sign four transactions:
+    </p>
+    <ul>
+      <li>
+        <strong>BTC claim</strong>: a Schnorr-adaptor pre-signature
+        over <code>T<sub>G</sub></code>. Verifies under the
+        aggregate x-only pubkey via standard BIP340; not a valid
+        Schnorr sig until adapted with <code>t</code>.
+      </li>
+      <li>
+        <strong>BTC refund</strong>: a plain MuSig2 signature
+        timelocked to <code>t<sub>BTC</sub></code>. Broadcastable
+        if the swap aborts.
+      </li>
+      <li>
+        <strong>PRIC claim</strong>: a cooperative adaptor-CLSAG
+        pre-signature over <code>T<sub>G</sub></code> /
+        <code>T<sub>H</sub></code>.
+      </li>
+      <li>
+        <strong>PRIC refund</strong>: a plain cooperative CLSAG
+        timelocked to <code>t<sub>PRIC</sub></code>.
+      </li>
+    </ul>
+
+    <h3>Claim</h3>
+    <p>
+      The PRIC buyer claims first. They adapt the PRIC claim
+      pre-sig with their held <code>t</code>, producing a valid
+      CLSAG, and broadcast the PRIC claim transaction. The
+      published CLSAG signature reveals <code>t</code> to anyone
+      who holds the matching pre-signature — specifically, the
+      PRIC seller. The seller extracts <code>t</code> via
+      <code>adaptor_ringsig::Extract(ring, presig, sig)</code>,
+      adapts the BTC claim pre-sig with <code>t</code> to produce a
+      valid BIP340 signature, and broadcasts the BTC claim
+      transaction.
+    </p>
+    <p>
+      Atomicity is cryptographic. The PRIC buyer cannot claim PRIC
+      without revealing <code>t</code> on chain. The PRIC seller's
+      BTC claim is signed under the same <code>t</code>; if the
+      buyer never claims PRIC, the seller waits for
+      <code>t<sub>PRIC</sub></code> and broadcasts the PRIC refund.
+      If the seller never broadcasts the BTC claim, the buyer waits
+      for <code>t<sub>BTC</sub></code> and broadcasts the BTC
+      refund. Neither party can take both legs.
+    </p>
+  </div>
+</section>
+
+<section class="section wp-section">
+  <div class="container">
+    <h2 id="swap-ltc">LTC↔PRIC atomic swap</h2>
+    <p>
+      Litecoin does not have Taproot, so the BTC swap's MuSig2 +
+      Schnorr-adaptor flow over P2TR cannot be used directly. A
+      naive substitute — a SHA-256 hashlock HTLC bound to
+      <code>H<sub>t</sub> = SHA256(t)</code> — has a subtle
+      atomicity flaw: there is no way to prove
+      <code>H<sub>t</sub> = SHA256(t)</code> where
+      <code>t = dlog(T<sub>G</sub>)</code> in zero knowledge without
+      a SNARK over SHA-256. A malicious PRIC buyer can publish a
+      fabricated <code>H<sub>t</sub>'</code>, claim PRIC normally
+      (revealing the real <code>t</code>), and leave the PRIC seller
+      unable to satisfy the LTC HTLC.
+    </p>
+    <p>
+      Pricoin's LTC protocol uses a <em>discrete-log-bound HTLC</em>
+      instead. The LTC HTLC redeem script is:
+    </p>
+<pre><code>OP_IF
+  &lt;PRIC_seller_pubkey&gt; OP_CHECKSIGVERIFY
+  &lt;T_G_compressed&gt; OP_CHECKSIG
+OP_ELSE
+  &lt;timeout&gt; OP_CHECKLOCKTIMEVERIFY OP_DROP
+  &lt;PRIC_buyer_pubkey&gt; OP_CHECKSIG
+OP_ENDIF</code></pre>
+    <p>
+      The claim path requires <em>two</em> ECDSA signatures: one
+      under the seller's pubkey (proving they're the seller) and one
+      under <code>T<sub>G</sub></code> itself. Anyone who knows
+      <code>t = dlog(T<sub>G</sub>)</code> can construct the second
+      signature (treating <code>t</code> as the privkey for
+      <code>T<sub>G</sub></code>). Knowledge of <code>t</code> is
+      enforced by the script verifier, not by an off-chain hash
+      relation; no SNARK or trust assumption is required.
+    </p>
+    <p>
+      The cross-chain binding is identical to BTC: the same
+      <code>T<sub>G</sub></code> appears in the LTC redeem script
+      and as the adaptor point for the PRIC adaptor-CLSAG. When
+      the PRIC buyer claims PRIC, <code>t</code> is revealed on the
+      PRIC chain and the seller uses it to build the LTC claim
+      witness <code>[T<sub>G</sub>_sig, seller_sig, 0x01,
+      redeem_script]</code>.
+    </p>
+    <p>
+      <strong>Privacy tradeoff.</strong> The DL-HTLC's redeem script
+      has a recognizable on-chain shape (two <code>OP_CHECKSIG</code>
+      on the IF branch, CLTV on the ELSE), distinguishable from a
+      generic 2-of-2 multisig. A future hardening pass could
+      replace this with a 2-of-2 P2WSH funded under a cooperative
+      ECDSA + ECDSA adaptor protocol, achieving the same
+      indistinguishability as the BTC P2TR leg, but at substantial
+      cryptographic-engineering cost (Paillier or class-group
+      encryption, multiple zero-knowledge proofs). The DL-HTLC is
+      the v1 design; cooperative-ECDSA is on the roadmap.
+    </p>
+  </div>
+</section>
+
+<section class="section alt wp-section">
+  <div class="container">
+    <h2 id="discovery">Discovery via Nostr</h2>
+    <p>
+      Pricoin's orderbook and peer-to-peer messaging layer rides on
+      Nostr (Notes and Other Stuff Transmitted by Relays), a
+      lightweight pub-sub protocol over WebSockets. There is no
+      centralized matching engine. Any user can run a relay; the
+      Pricoin foundation operates a four-node mesh
+      (<code>relay1..4.pricoin.io</code>) cross-streamed via strfry
+      so an event ingested anywhere replicates to all four within
+      hundreds of milliseconds.
+    </p>
+
+    <h3>Order events (kind 30030)</h3>
+    <p>
+      Offers are published as Nostr <em>parameterized replaceable
+      events</em> (NIP-33) at kind <code>30030</code>:
+    </p>
+<pre><code>{
+  "kind":    30030,
+  "pubkey":  &lt;maker's swap-identity x-only pubkey, hex&gt;,
+  "tags": [
+    ["d",          "&lt;order_id&gt;"],
+    ["expiration", "&lt;unix_sec&gt;"],
+    ["c",          "btc" | "ltc"],
+    ["s",          "buy" | "sell"]
+  ],
+  "content": "pricoffer:v1/&lt;base64-payload&gt;",
+  "id":      sha256(canonical [0,pubkey,ts,kind,tags,content]),
+  "sig":     BIP340 sig over id by maker's swap-identity priv
+}</code></pre>
+    <p>
+      The base64 payload encodes the offer's full parameters:
+      side, amounts, foreign-chain identifier, expiry, maker
+      pubkey, and an internal ECDSA signature. Both the Nostr
+      event signature and the URI's internal signature are
+      validated; a mismatch is rejected.
+    </p>
+
+    <h3>Direct messages (kind 4 / NIP-04)</h3>
+    <p>
+      Peer-to-peer coordination during a swap (joint stealth
+      handshake, match notifications, swap-start params, on-chain
+      sig + ring after a claim) flows through NIP-04 encrypted
+      DMs. The shared key is the X-coordinate of
+      <code>ECDH(my_swap_priv, peer_xonly_pub→even-y)</code>, the
+      same construction Bitcoin's adaptor-MuSig2 uses for binding.
+      Content is AES-256-CBC + random IV.
+    </p>
+    <p>
+      Pricoin layers an application-level ACK on top of NIP-04: each
+      structured DM carries a <code>dm_id</code> field; the
+      receiver auto-emits <code>{"type":"pricoin:ack/v1",
+      "ack_for":&lt;dm_id&gt;}</code> on receipt. Senders can
+      surface "Awaiting receipt" / "Counterparty received" status
+      to the user. Without ACKs, "delivered to relays" is the only
+      delivery signal, which says nothing about whether the
+      counterparty's wallet processed the message.
+    </p>
+
+    <h3>Pricoin relay mesh</h3>
+    <p>
+      The four foundation-operated relays run strfry behind nginx
+      with Let's Encrypt certs. Each relay's writepolicy filter
+      accepts only kinds <code>4, 5, 30030</code>, keeping the
+      mesh focused on Pricoin traffic and avoiding general Nostr
+      noise. Cross-streaming uses
+      <code>strfry stream --dir both</code> in a 4-node, 6-edge
+      full mesh: each relay runs three stream daemons (one per
+      peer); any single-node failure leaves the surviving three
+      fully synced.
+    </p>
+    <p>
+      Users are not required to use the foundation relays. The
+      relay list is a wallet setting; any Nostr relay that accepts
+      kind <code>30030</code> works. Self-hosting is encouraged for
+      stronger privacy.
+    </p>
+  </div>
+</section>
+
+<section class="section wp-section">
+  <div class="container">
+    <h2 id="wallet">Wallet architecture</h2>
+    <p>
+      A Pricoin wallet is built on Bitcoin Core's wallet code with
+      a stealth-identity layer added on top. The user's persistent
+      secret is a <em>stealth seed</em>: a 32-byte random value
+      from which the view key, spend key, and per-purpose
+      sub-identities are deterministically derived via HMAC chains.
+    </p>
+
+    <h3>Key derivation</h3>
+    <p>
+      The stealth seed produces:
+    </p>
+    <ul>
+      <li>
+        <strong>View key</strong> <code>a</code> and
+        <strong>spend key</strong> <code>b</code> — the dual-key
+        stealth address pair. Stored in
+        <code>wallets/&lt;name&gt;/pricoin_stealth.dat</code>.
+      </li>
+      <li>
+        <strong>Swap-identity key</strong> — used as the maker
+        pubkey in orderbook events, the Nostr identity, and the
+        cooperative-signing key for atomic swaps. Derived as
+        <code>HMAC-SHA256(spend_seed, "pricoin/swap/identity-v1")</code>.
+      </li>
+      <li>
+        <strong>Holding-wallet keys</strong> — one per foreign
+        chain. Derived as
+        <code>HMAC-SHA256(spend_seed, "pricoin/holding/&lt;chain&gt;-v1")</code>.
+        Used to sign foreign-chain funding/sweep transactions.
+      </li>
+    </ul>
+    <p>
+      Restoring from the stealth seed alone recovers all derived
+      keys, including the foreign-chain holding wallets. Users
+      retain full custody of their BTC and LTC at all times — the
+      holding wallets are simplified by design (no address book,
+      no fee estimation for arbitrary spends, no multi-recipient
+      sends), but the keys are theirs.
+    </p>
+
+    <h3>Holding wallets</h3>
+    <p>
+      Cross-chain swaps require the user to deposit BTC or LTC at
+      a per-chain receive address before the swap can fund. The
+      holding wallet supports:
+    </p>
+    <ul>
+      <li>Receive — single deterministic P2TR (BTC) or P2WPKH (LTC) address.</li>
+      <li>Balance query — via the configured Esplora-style HTTP backend.</li>
+      <li>Sweep — send all UTXOs to an external destination, fee suggested from the backend's <code>/fee-estimates</code>.</li>
+      <li>Atomic-swap funding — invoked by the swap protocol; not user-callable directly.</li>
+    </ul>
+    <p>
+      Default backends are
+      <code>https://blockstream.info/api</code> (BTC) and
+      <code>https://litecoinspace.org/api</code> (LTC). Users
+      concerned about address-clustering by these third-party
+      services can replace either with a self-hosted Esplora
+      instance via the <code>-btcwatchurl</code> /
+      <code>-ltcwatchurl</code> daemon flags.
+    </p>
+
+    <h2 id="mining">Mining &amp; pools</h2>
+    <p>
+      Solo mining via <code>pricoind</code>'s built-in
+      <code>generatetoaddress</code> RPC works for regtest /
+      development. For mainnet, the foundation operates a PPLNS
+      pool reachable at <code>stratum.pricoin.org:3333</code>
+      (Stratum V1 over plain TCP). Cloudflare cannot proxy raw
+      Stratum, so the pool runs behind DNS-only routing.
+    </p>
+
+    <h3>Pool architecture</h3>
+    <p>
+      The pool is implemented in Python 3 with a C extension
+      (<code>rxshare</code>) wrapping libRandomX for fast share
+      verification. Components: <code>pool.rpc</code> (cookie +
+      rpcauth-aware JSON-RPC client), <code>pool.db</code>
+      (SQLite WAL schema for workers/shares/blocks/payouts),
+      <code>pool.pplns</code> (sliding-window split with
+      largest-remainder rounding), <code>pool.vardiff</code>
+      (per-connection difficulty retarget),
+      <code>pool.jobs</code> (getblocktemplate → 80-byte blob
+      with real coinbase + merkle and a 4-deep recent template
+      ring), <code>pool.stratum</code> (asyncio TCP),
+      <code>pool.payouts</code> (batched
+      <code>walletsendct_multi</code>),
+      <code>pool.web</code> (Flask /api stats).
+    </p>
+
+    <h3>Miner support</h3>
+    <p>
+      Pricoin uses Bitcoin's 80-byte header layout, which differs
+      from Monero's 39-byte hash blob. The reference miner is a
+      fork of <a href="https://github.com/xmrig/xmrig">xmrig</a> at
+      v6.26.0 with ~150 lines of patches: a new
+      <code>rx/pric</code> algorithm enum, a 76-byte nonce offset
+      (vs Monero's 39), a Pricoin coin entry, and OpenCL kernel
+      updates. The binary is <code>pricoin-miner</code>; build with
+      <code>cmake -DWITH_HWLOC=OFF -DWITH_OPENCL=OFF -DWITH_CUDA=OFF</code>
+      for the simplest CPU-only configuration.
+    </p>
+  </div>
+</section>
+
+<section class="section alt wp-section">
+  <div class="container">
+    <h2 id="threats">Threat model</h2>
+
+    <h3>What's protected</h3>
+    <ul>
+      <li>
+        <strong>Amount privacy.</strong> An observer with the full
+        chain history cannot recover the value of any non-coinbase
+        output beyond proving it lies in
+        <code>[0, 2<sup>64</sup>)</code>. Total emission is
+        auditable from coinbase outputs only.
+      </li>
+      <li>
+        <strong>Recipient privacy.</strong> Outputs paying the same
+        stealth address are unlinkable on chain. The recipient's
+        identity is concealed even from the sender after the
+        transaction confirms.
+      </li>
+      <li>
+        <strong>Sender privacy (probabilistic).</strong> The real
+        signer of a CLSAG is hidden among 16 ring members.
+        Effective privacy depends on decoy-selection quality —
+        Pricoin uses Monero's gamma distribution.
+      </li>
+      <li>
+        <strong>Cross-chain swap atomicity.</strong> Either both
+        legs settle, or both refund. No party can take both
+        sides; the cryptographic binding via
+        <code>T<sub>G</sub></code> makes this a property of the
+        protocol, not of trusted intermediaries.
+      </li>
+    </ul>
+
+    <h3>What's not protected</h3>
+    <ul>
+      <li>
+        <strong>Network-level metadata.</strong> Pricoin nodes
+        broadcast transactions over a P2P gossip protocol the same
+        as Bitcoin. An adversary with broad network observation can
+        link transactions to source IPs unless the user runs over
+        Tor / I2P. <code>-listenonion</code> is supported.
+      </li>
+      <li>
+        <strong>Wallet metadata.</strong> The wallet's view key
+        scans every confirmed v4 output to find incoming payments.
+        Anyone with the view key can read incoming amounts (but not
+        spend). The wallet stores per-tx history including
+        recovered amounts. A device compromise reveals everything
+        the wallet has scanned.
+      </li>
+      <li>
+        <strong>Decoy-selection failures.</strong> If the gamma
+        distribution becomes a poor model of real spending behavior
+        (e.g., due to a sudden shift in the age distribution of
+        outputs), real signers can become statistically
+        identifiable. Periodic distribution review is on the
+        roadmap.
+      </li>
+      <li>
+        <strong>Foreign-chain privacy on swaps.</strong> The PRIC
+        leg of an atomic swap is fully confidential. The BTC leg is
+        a 2-of-2 P2TR — indistinguishable from any other key-path
+        Taproot spend. The LTC leg's DL-HTLC has a recognizable
+        script shape on chain; mitigations are documented above
+        (<a href="#swap-ltc">§ LTC swap</a>).
+      </li>
+      <li>
+        <strong>Order-discovery metadata.</strong> Nostr relays see
+        the maker pubkey on every published order. The pubkey is
+        per-wallet, not per-order, so a malicious relay can link
+        all orders by the same maker. Self-hosting your own relay
+        addresses this; subscribing only to your own relay does
+        not (you'd still see no orders from anyone else).
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section class="section wp-section">
+  <div class="container">
+    <h2 id="limitations">Known limitations</h2>
+    <p>
+      Pricoin is experimental research code. Several components have
+      not received external cryptographic review:
+    </p>
+    <ul>
+      <li>
+        <strong>Adaptor-CLSAG.</strong> The adaptor-signature
+        construction over CLSAG is novel; it follows known
+        adaptor-Schnorr techniques but the multi-layer extension
+        has not been peer-reviewed. Suitable for testnet research
+        only at present.
+      </li>
+      <li>
+        <strong>Cooperative joint CLSAG.</strong> Three-round
+        protocol with PoP rogue-key defense. The joint case
+        amplifies the risk surface relative to single-party CLSAG.
+        Implementation passes an internal end-to-end self-test
+        gauntlet but lacks external audit.
+      </li>
+      <li>
+        <strong>Borromean rangeproofs.</strong> ~1 280 bytes per
+        output is large. Bulletproofs+ in libsecp256k1-zkp would
+        cut this by an order of magnitude but the BPP module
+        upstream is marked experimental.
+      </li>
+      <li>
+        <strong>LTC swap script fingerprint.</strong> See
+        <a href="#swap-ltc">§ LTC swap</a> — the DL-HTLC has a
+        distinctive on-chain shape. Cooperative-ECDSA + ECDSA-
+        adaptor would close this gap; deferred to v2.
+      </li>
+      <li>
+        <strong>Mainnet at low difficulty.</strong> The chain is
+        new; difficulty has not yet stabilized at a level that
+        would deter a well-resourced adversary from briefly
+        attaining majority hashrate. Confirmations should be
+        deeper than Bitcoin's 6-block convention until mainnet
+        hashrate is established.
+      </li>
+    </ul>
+
+    <h2 id="future">Future work</h2>
+    <ul>
+      <li>
+        <strong>Bulletproofs+ rangeproofs</strong> — gated on
+        upstream stabilization in libsecp256k1-zkp.
+      </li>
+      <li>
+        <strong>Cooperative ECDSA + ECDSA-adaptor</strong> for the
+        LTC leg, achieving the same indistinguishability as the
+        BTC P2TR funding output.
+      </li>
+      <li>
+        <strong>DOGE / BCH atomic swaps.</strong> The DL-HTLC
+        primitive is chain-neutral; adding a new non-Taproot chain
+        is mostly Esplora plumbing and a network-params entry.
+      </li>
+      <li>
+        <strong>Decoy-distribution review.</strong> Monitor on-chain
+        spending behavior; if the gamma distribution drifts away
+        from observed reality, retune.
+      </li>
+      <li>
+        <strong>Mobile wallet.</strong> A lightweight client for
+        the orderbook + DM layer that can participate in matching
+        without a full node.
+      </li>
+      <li>
+        <strong>External cryptographic review.</strong> Adaptor-
+        CLSAG and the joint signing protocols deserve an
+        independent academic review before mainnet sees
+        non-trivial value.
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section class="section alt wp-section">
+  <div class="container">
+    <h2 id="refs">References</h2>
+    <ol>
+      <li>
+        Goodell, Noether, RandomX: <em>RandomX</em>. tevador, 2019.
+        <a href="https://github.com/tevador/RandomX">github.com/tevador/RandomX</a>
+      </li>
+      <li>
+        Maxwell, G. <em>Confidential Transactions</em>. 2015.
+        <a href="https://elementsproject.org/features/confidential-transactions/investigation">elementsproject.org</a>
+      </li>
+      <li>
+        van Saberhagen, N. <em>CryptoNote v 2.0</em>. 2013.
+        Original stealth-address construction.
+      </li>
+      <li>
+        Goodell, Noether, RandomRun. <em>Concise Linkable Ring
+        Signatures and Forgery Against Adversarial Keys</em>
+        (CLSAG). 2019.
+      </li>
+      <li>
+        Bünz, B. et al. <em>Bulletproofs: Short Proofs for
+        Confidential Transactions and More</em>. 2018.
+      </li>
+      <li>
+        Nick, Ruffing, Seurin. <em>MuSig2: Simple Two-Round
+        Schnorr Multi-Signatures</em>. 2020.
+      </li>
+      <li>
+        Poelstra, A. <em>Scriptless Scripts</em>. 2017. Original
+        adaptor-signature construction.
+      </li>
+      <li>
+        Wuille, P., Nick, J., Towns, A. <em>BIP-340 / 341 / 342</em>:
+        Schnorr signatures and Taproot for Bitcoin.
+      </li>
+      <li>
+        Fournier, L. <em>One-Time Verifiably Encrypted Signatures</em>
+        (ECDSA adaptor signatures). 2019.
+      </li>
+      <li>
+        Nostr. <em>NIP-01, NIP-04, NIP-13, NIP-33, NIP-40</em>.
+        <a href="https://github.com/nostr-protocol/nips">github.com/nostr-protocol/nips</a>
+      </li>
+      <li>
+        Hoytech. <em>strfry</em>. High-performance Nostr relay.
+        <a href="https://github.com/hoytech/strfry">github.com/hoytech/strfry</a>
+      </li>
+    </ol>
+
+    <div class="footnote">
+      <p>
+        This document is a living specification. Discrepancies
+        between this document and the reference implementation in
+        <a href="https://github.com/pricoinfoundation/pricoin">pricoinfoundation/pricoin</a>
+        should be resolved in favor of the implementation, with
+        this document treated as the documentation that needs
+        updating.
+      </p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <img class="brand-mark" src="pricoinlogo-64.png" alt="" width="28" height="28">
+      <span>Pricoin</span>
+    </div>
+    <p class="footer-subtitle">Privacy by default. Bitcoin Core lineage. Open source.</p>
+    <p class="footer-disclaimer">
+      Experimental research software. Not for production use.
+      © 2026 The Pricoin developers. MIT licensed.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
