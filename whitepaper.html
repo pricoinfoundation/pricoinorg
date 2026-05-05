@@ -90,6 +90,138 @@
     }
     .footnote ol { padding-left: 20px; }
     .footnote li { margin-bottom: 6px; }
+
+    /* ── Print / PDF stylesheet ────────────────────────────────────
+       Active when WeasyPrint renders this document, or when the page
+       is sent to a printer. Strips site chrome (topbar, footer,
+       homepage CTA) and reformats for letter-paper reading. */
+    @page {
+      size: letter;
+      margin: 22mm 20mm 22mm 20mm;
+
+      @top-left {
+        content: "Pricoin Whitepaper";
+        font-family: Inter, -apple-system, system-ui, sans-serif;
+        font-size: 9pt;
+        color: #888;
+      }
+      @top-right {
+        content: "v1 · 2026";
+        font-family: Inter, -apple-system, system-ui, sans-serif;
+        font-size: 9pt;
+        color: #888;
+      }
+      @bottom-center {
+        content: counter(page) " / " counter(pages);
+        font-family: Inter, -apple-system, system-ui, sans-serif;
+        font-size: 9pt;
+        color: #888;
+      }
+    }
+    @page :first {
+      @top-left { content: ""; }
+      @top-right { content: ""; }
+    }
+
+    @media print {
+      /* Hide site chrome — the PDF stands alone. */
+      header.topbar,
+      footer.footer,
+      .pdf-only-hidden { display: none !important; }
+
+      /* Body: ink-friendly, slightly tighter than screen. */
+      html, body {
+        background: #fff !important;
+        color: #111 !important;
+        font-size: 10.5pt;
+        line-height: 1.45;
+      }
+      main { padding: 0 !important; }
+      .section {
+        padding: 0 !important;
+        background: transparent !important;
+        border: 0 !important;
+      }
+      .section.alt { background: transparent !important; }
+      .container {
+        max-width: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      /* Title block: keep the H1 + meta together at the top of page 1. */
+      h1 {
+        font-size: 22pt !important;
+        line-height: 1.2 !important;
+        margin: 0 0 4pt !important;
+      }
+      .wp-meta { margin: 0 0 18pt !important; font-size: 9.5pt; }
+
+      /* Avoid breaks right after a heading. */
+      h2, h3, h4 { break-after: avoid; page-break-after: avoid; }
+      h2 { font-size: 15pt; margin-top: 22pt; margin-bottom: 6pt; }
+      h3 { font-size: 12pt; margin-top: 14pt; margin-bottom: 4pt; }
+
+      /* Major sections start on a new page — except the very first
+         section after the abstract/TOC. */
+      section.wp-section { break-before: page; page-break-before: always; }
+
+      /* Keep code blocks, formulas, and tables intact across pages. */
+      pre, .formula, table { break-inside: avoid; page-break-inside: avoid; }
+      pre, code, .formula {
+        background: #f6f6f3 !important;
+        color: #111 !important;
+        border-color: #ccc !important;
+      }
+      pre {
+        padding: 8pt 10pt;
+        border: 1px solid #ddd;
+        font-size: 8.5pt;
+        line-height: 1.4;
+      }
+      .formula {
+        background: #fafaf7 !important;
+        border-left-color: #888 !important;
+        font-size: 9.5pt;
+      }
+
+      /* Tables: simple printable style. */
+      table.compare, table {
+        font-size: 9.5pt;
+        border-collapse: collapse;
+        width: 100%;
+      }
+      table.compare th, table.compare td,
+      table th, table td {
+        border: 1px solid #d8d8d2 !important;
+        padding: 5pt 7pt !important;
+        background: transparent !important;
+      }
+      table.compare thead th { background: #f3f1eb !important; }
+
+      /* Links: keep colored on screen, dark on print. URLs are not
+         auto-appended — internal #anchors would clutter the page. */
+      a, a:visited { color: #1a3e8a; text-decoration: none; }
+
+      /* TOC: nicer for print — single column, dotted leaders for
+         section names (page numbers aren't generated for HTML
+         anchors, so plain entries are fine). */
+      .wp-toc {
+        background: transparent !important;
+        border: 1px solid #ccc !important;
+        padding: 12pt 16pt !important;
+        margin: 18pt 0 !important;
+      }
+      .wp-toc ol { columns: 2; column-gap: 28pt; }
+      .wp-toc li { margin-bottom: 2pt; }
+
+      /* Orphan/widow control across the document. */
+      p, li { orphans: 3; widows: 3; }
+
+      /* The "PDF version available" line is meaningless inside the
+         PDF — hide it. Marked via class on the wrapper paragraph. */
+      .no-print { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -143,7 +275,7 @@
       <code>T<sub>G</sub></code>.
     </p>
 
-    <p>
+    <p class="no-print">
       This document is the technical specification of the protocol.
       For an overview aimed at non-cryptographers, see the
       <a href="index.html">Pricoin homepage</a>. A printable
@@ -1019,7 +1151,7 @@ OP_ENDIF</code></pre>
       Solo mining via <code>pricoind</code>'s built-in
       <code>generatetoaddress</code> RPC works for regtest /
       development. For mainnet, the foundation operates a PPLNS
-      pool reachable at <code>stratum.pricoin.org:3333</code>
+      pool reachable at <code>stratum.pricoin.io:3333</code>
       (Stratum V1 over plain TCP). Cloudflare cannot proxy raw
       Stratum, so the pool runs behind DNS-only routing.
     </p>

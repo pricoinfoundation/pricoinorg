@@ -474,10 +474,12 @@ pricoin-miner \
       <h3>Mainnet difficulty &amp; ramp-up</h3>
       <p>
         The mainnet genesis is mined at the lowest possible RandomX
-        difficulty target (<code>0x207fffff</code>). Post-genesis, Bitcoin's
-        standard difficulty adjustment algorithm (DAA) kicks in: re-target
-        every <code>2016</code> blocks (about 3.5 days at 150 s/block) so
-        average inter-block time tracks the network hashrate.
+        difficulty target (<code>0x207fffff</code>). Post-genesis, a
+        Bitcoin-style difficulty adjustment algorithm kicks in:
+        re-target every <code>288</code> blocks (12 hours at 150 s/block)
+        so average inter-block time tracks the network hashrate. The
+        shorter retarget window (vs Bitcoin's 2016 blocks / ~2 weeks)
+        suits a brand-new chain where hashrate can change quickly.
       </p>
     </div>
   </section>
