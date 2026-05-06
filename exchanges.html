@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pricoin — Exchange integration guide</title>
+  <meta name="description" content="How to integrate Pricoin (PRIC) deposits and withdrawals on an exchange. Subaddress-based deposit attribution, confidential transaction sends, address validation, and confirmation handling.">
+  <meta name="theme-color" content="#fdfcf9">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+  <link rel="apple-touch-icon" sizes="200x200" href="pricoinlogo-200.png">
+
+  <style>
+    /* Page-specific tweaks. */
+    .meth-table th:nth-child(1),
+    .meth-table td:nth-child(1) { white-space: nowrap; }
+    .meth-table code { white-space: nowrap; }
+    .step-list { counter-reset: step; padding-left: 0; list-style: none; }
+    .step-list > li {
+      counter-increment: step;
+      position: relative;
+      padding: 0 0 18px 44px;
+    }
+    .step-list > li::before {
+      content: counter(step);
+      position: absolute; left: 0; top: 0;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--accent, #6b4ba8);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 0.9em;
+    }
+    .step-list > li > h4 { margin: 0 0 4px; }
+    .anchor-mark { color: var(--text-soft); font-weight: 400; }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <a class="brand" href="index.html#top">
+      <img class="brand-mark" src="pricoinlogo-64.png" alt="" width="32" height="32">
+      <span class="brand-name">Pricoin</span>
+    </a>
+    <nav class="topnav">
+      <a href="index.html#what">Overview</a>
+      <a href="index.html#different">Different</a>
+      <a href="index.html#monero">vs Monero</a>
+      <a href="index.html#swaps">Swaps</a>
+      <a href="exchanges.html" aria-current="page">Exchanges</a>
+      <a href="whitepaper.html">Whitepaper</a>
+      <a class="github" href="https://github.com/pricoinfoundation/pricoin" target="_blank" rel="noopener">GitHub →</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="section">
+  <div class="container">
+    <div class="status-badge">Integration guide · For exchange operators</div>
+    <h1 style="margin-top: 8px; font-size: clamp(28px, 4vw, 40px); line-height: 1.18;">
+      Integrating Pricoin deposits and withdrawals
+    </h1>
+    <p class="lede" style="margin-top: 6px;">
+      Pricoin's RPC surface follows Bitcoin Core conventions, with one
+      important addition: every non-coinbase output is confidential, and
+      deposit attribution uses <strong>subaddresses</strong> instead of
+      per-user transparent addresses. This page maps the standard
+      exchange-integration verbs to the actual RPCs and walks through
+      both the deposit and withdrawal paths end-to-end.
+    </p>
+
+    <p>
+      <strong>If you've integrated Bitcoin before:</strong> the daemon
+      starts the same way (<code>pricoind</code>, JSON-RPC on port
+      8332/18443), the wallet model is the same, and most of the
+      familiar verbs (<code>getblock</code>, <code>getrawtransaction</code>,
+      <code>getblockchaininfo</code>) work unchanged. The differences
+      live in three places: how you allocate deposit addresses, how you
+      detect incoming credits, and how you broadcast withdrawals.
+    </p>
+
+    <div class="warning">
+      <strong>Status:</strong> this guide tracks Pricoin v0.1.x.
+      Treat it as a working draft — RPC names and JSON shapes can still
+      change. Open an issue on
+      <a href="https://github.com/pricoinfoundation/pricoin">GitHub</a>
+      if anything looks wrong or incomplete.
+    </div>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container">
+    <h2>Methods cheat-sheet</h2>
+    <p>
+      The conventional exchange-integration verbs and what they map to
+      in Pricoin's RPC surface. Anything that doesn't appear here behaves
+      identically to upstream Bitcoin Core.
+    </p>
+
+    <table class="compare meth-table">
+      <thead>
+        <tr><th>Conventional verb</th><th>Pricoin RPC(s)</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>getNetworkInfo</td>
+          <td><code>getnetworkinfo</code><br><code>getblockchaininfo</code></td>
+          <td>Same as Bitcoin. Use <code>getblockchaininfo.blocks</code> for confirmation tracking.</td>
+        </tr>
+        <tr>
+          <td>getNewAddress</td>
+          <td><code>pricoin_getnewsubaddress&nbsp;[label]</code></td>
+          <td>Allocates a fresh deposit subaddress (index ≥ 1). One per user. Returns <code>pricsub…</code>-prefixed encoding that carries the index in its payload.</td>
+        </tr>
+        <tr>
+          <td>validateAddress</td>
+          <td><code>validateaddress&nbsp;&lt;addr&gt;</code></td>
+          <td>Recognises transparent (<code>pric…</code>), stealth-main (<code>pricstl…</code>), and stealth-subaddress (<code>pricsub…</code>). The <code>kind</code> field tells you which.</td>
+        </tr>
+        <tr>
+          <td>getBlock</td>
+          <td><code>getblock&nbsp;&lt;hash&gt;&nbsp;[verbosity]</code></td>
+          <td>Same as Bitcoin. CT outputs appear with their commitments and rangeproofs in the verbose form.</td>
+        </tr>
+        <tr>
+          <td>getTransaction</td>
+          <td><code>gettransaction&nbsp;&lt;txid&gt;</code><br><code>getrawtransaction&nbsp;&lt;txid&gt;&nbsp;1</code></td>
+          <td>Returns header metadata and the raw v4 transaction. Amounts are blinded — use <code>pricoin_listownct</code> to discover values payable to your wallet.</td>
+        </tr>
+        <tr>
+          <td>getRecentTransactions</td>
+          <td><code>pricoin_listownct</code></td>
+          <td>The deposit-discovery RPC. Returns one row per recovered output with <code>txid</code>, <code>vout</code>, <code>value</code>, <code>height</code>, <code>subaddress_index</code>, and <code>subaddress</code>.</td>
+        </tr>
+        <tr>
+          <td>sendTransaction</td>
+          <td><code>walletsendct&nbsp;&lt;dest&gt;&nbsp;&lt;amount&gt;&nbsp;&lt;fee&gt;</code><br><code>walletsendct_ring</code> (with ring sig)</td>
+          <td>Withdrawal path. <code>dest</code> can be transparent, master stealth, or subaddress — the wallet branches on kind automatically.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="note">
+      The legacy <code>sendtoaddress</code>/<code>sendmany</code>/<code>send</code>/<code>sendall</code>
+      calls return <code>RPC_METHOD_DEPRECATED</code> on Pricoin —
+      consensus rejects v1/v2/v3 transparent transactions. Withdrawals
+      always go through the CT send path.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2>Deposits — attributing incoming funds to users</h2>
+    <p>
+      Pricoin's stealth model means every output is private — even with
+      the wallet's view key, an outside observer cannot link two payments
+      to the same identity. To still tell deposits apart by user, the
+      exchange hands each user their own <strong>subaddress</strong>: a
+      deterministic per-index identity derived from the wallet's master
+      seed. All subaddresses share one view scalar, so a single wallet
+      recovers payments to any of them.
+    </p>
+
+    <ol class="step-list">
+      <li>
+        <h4>Allocate one subaddress per user</h4>
+        <p>
+          When a new user registers, call
+          <code>pricoin_getnewsubaddress&nbsp;"&lt;your-internal-user-id&gt;"</code>.
+          The returned <code>address</code> is what you display on the
+          deposit screen; the <code>index</code> is what your DB pins
+          the user to.
+        </p>
+        <pre><code>$ pricoin-cli -rpcwallet=hot pricoin_getnewsubaddress "user-4815"
+{
+  "index": 47,
+  "address": "2qdRXWpkrmNVLad...AqqCKWe1RnHxFNgV5L7JSD8",
+  "view_pubkey":  "030f99...ba536514",
+  "spend_pubkey": "02fac0...c231ffdec",
+  "label": "user-4815"
+}</code></pre>
+        <p>
+          Indices are monotonic and never reused. Backups are still just
+          the wallet seed — the seed deterministically reproduces every
+          subaddress for restored wallets.
+        </p>
+      </li>
+
+      <li>
+        <h4>Poll <code>pricoin_listownct</code> for new credits</h4>
+        <p>
+          On a schedule (every block tick, or every N seconds — your
+          call), run:
+        </p>
+        <pre><code>$ pricoin-cli -rpcwallet=hot pricoin_listownct
+{
+  "scanned_blocks": 0,                  ← 0 means warm cache hit
+  "scanned_mempool_txs": 0,
+  "total_recovered": "32.50000000",
+  "outputs": [
+    {
+      "txid":             "ab12...",
+      "vout":             1,
+      "value":            "5.00000000",
+      "height":           812347,
+      "subaddress_index": 47,
+      "subaddress":       "2qdRXWpkrm...JSD8"
+    },
+    ...
+  ]
+}</code></pre>
+        <p>
+          The first call after a fresh daemon start pays for a full
+          chain scan; subsequent calls only walk the new tip-extension.
+          Steady-state polling is cheap.
+        </p>
+      </li>
+
+      <li>
+        <h4>Attribute by <code>subaddress_index</code></h4>
+        <p>
+          Map each row's <code>subaddress_index</code> to the user you
+          allocated it to. <code>0</code> means the master stealth
+          address (handle as you see fit — typically internal/sweep
+          flows, not user deposits). The encoded <code>subaddress</code>
+          field is also surfaced so you can key directly off the
+          string if your DB stored that instead.
+        </p>
+      </li>
+
+      <li>
+        <h4>Track confirmations</h4>
+        <p>
+          Compare each row's <code>height</code> against the current tip
+          from <code>getblockchaininfo.blocks</code>. Apply your
+          confirmation policy (Pricoin's block time is 150 s, so 6
+          confirmations ≈ 15 minutes). Mempool entries report
+          <code>height = -1</code>.
+        </p>
+      </li>
+
+      <li>
+        <h4>Don't double-credit on rescans</h4>
+        <p>
+          <code>pricoin_listownct</code> returns every <em>currently-unspent</em>
+          recovery — outputs whose key images haven't yet appeared on
+          chain. Once you sweep a deposit (i.e. include it as an input
+          in a withdrawal), its key image lands on chain and the row
+          disappears from subsequent listings. Until that point, the
+          row repeats on every poll: track which (txid, vout) pairs
+          you've already credited.
+        </p>
+      </li>
+    </ol>
+
+    <p class="note">
+      <strong>One wallet, many users.</strong> A single hot wallet hands
+      out subaddresses for every user. There is no per-user wallet
+      sprawl, no <code>loadwallet</code> overhead, and no per-user
+      rescan. The subaddress lookup table is built once per scan pass
+      and amortised across all blocks walked.
+    </p>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container">
+    <h2>Withdrawals — sending PRIC to user-supplied addresses</h2>
+    <p>
+      Users withdraw to addresses they control: a transparent
+      <code>pric…</code>, a stealth master <code>pricstl…</code>, or a
+      subaddress <code>pricsub…</code>. Validate the input first, then
+      hand it to the CT send path.
+    </p>
+
+    <ol class="step-list">
+      <li>
+        <h4>Validate the destination</h4>
+        <p>
+          Call <code>validateaddress</code>. The <code>kind</code>
+          field is what to branch on:
+        </p>
+        <pre><code>$ pricoin-cli validateaddress "2qdRXWpkrmNVL...JSD8"
+{
+  "isvalid":          true,
+  "kind":             "stealth_subaddress",
+  "address":          "2qdRXWpkrmNVL...JSD8",
+  "view_pubkey":      "030f99...",
+  "spend_pubkey":     "02fac0...",
+  "subaddress_index": 47
+}</code></pre>
+        <p>Reject withdrawals where <code>isvalid</code> is false. Other
+        kinds (<code>transparent</code>, <code>stealth_main</code>,
+        <code>stealth_subaddress</code>) are all valid destinations —
+        the wallet's send path handles them correctly without per-kind
+        logic on your side.</p>
+      </li>
+
+      <li>
+        <h4>Broadcast via <code>walletsendct</code></h4>
+        <p>
+          Pricoin's CT-aware send RPC. Takes the destination,
+          PRIC amount, and miner fee:
+        </p>
+        <pre><code>$ pricoin-cli -rpcwallet=hot walletsendct \
+    "2qdRXWpkrmNVL...JSD8" 1.5 0.0001
+{
+  "txid":              "...",
+  "ct_outputs":        3,
+  "dest_was_stealth":  true
+}</code></pre>
+        <p>
+          For higher-anonymity withdrawals use <code>walletsendct_ring
+          &lt;dest&gt; &lt;amount&gt; &lt;fee&gt; &lt;ring_size&gt;</code>
+          which signs the input with a CLSAG ring of the given size
+          (default 4; 16 is the conservative recommendation for user
+          funds in a long-running hot wallet).
+        </p>
+      </li>
+
+      <li>
+        <h4>Watch the txid</h4>
+        <p>
+          Track confirmations the same way you do today —
+          <code>gettransaction&nbsp;&lt;txid&gt;</code> returns the
+          header info (status, confirmations, blockhash). The on-chain
+          tx is a v4 confidential transaction; the wallet has all the
+          metadata it needs to display it back to operators.
+        </p>
+      </li>
+    </ol>
+
+    <p class="note">
+      <strong>The wallet branches on address kind automatically.</strong>
+      Subaddress payments compute <code>R = r·B<sub>i</sub></code>
+      instead of <code>R = r·G</code>, which the wallet handles
+      internally — you don't need to know about this distinction.
+      Indistinguishability on chain is preserved either way.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2>Confirmations &amp; reorgs</h2>
+    <p>
+      Standard Bitcoin-style depth-based confirmation policy applies.
+      A few specifics worth knowing:
+    </p>
+    <ul class="bullet-list">
+      <li>
+        Block time is <strong>150 s</strong>, vs Bitcoin's 600 s. 6
+        confirmations is ~15 minutes; pick a depth that matches your
+        risk model. For exchange-grade attestation, 12–20 confirmations
+        is conservative.
+      </li>
+      <li>
+        The recovery cache (the per-wallet structure
+        <code>pricoin_listownct</code> uses to avoid re-scanning) detects
+        reorgs automatically. If the chain at the cached
+        <code>last_scanned_height</code> no longer hashes to the
+        remembered block hash, the cache is dropped and a full fresh
+        scan runs on the next call. You don't need to do anything.
+      </li>
+      <li>
+        Outputs disappear from <code>pricoin_listownct</code> when their
+        key image is seen on chain — i.e. when something (your wallet
+        or a successor of it) has spent them. <strong>Never</strong>
+        re-credit a deposit on disappearance — that means the funds
+        moved out, not that they were rolled back.
+      </li>
+      <li>
+        <code>getblockchaininfo</code> reports
+        <code>initialblockdownload: true</code> until headers and
+        blocks are caught up. Hold off on credit-decisions until that
+        flips to <code>false</code> after a fresh daemon start.
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container">
+    <h2>Operational notes</h2>
+
+    <h3>Wallet must be unlocked for scanning</h3>
+    <p>
+      <code>pricoin_listownct</code> needs the master view scalar to
+      derive shared secrets, and the master spend scalar to derive
+      one-time spend keys. Both live in the wallet's encrypted stealth
+      record. If the wallet is encrypted, call
+      <code>walletpassphrase&nbsp;&lt;passphrase&gt;&nbsp;&lt;timeout_sec&gt;</code>
+      first. A common operations setup: encrypt the wallet at rest,
+      unlock it on daemon start via a wrapped secret in your secrets
+      manager, re-unlock periodically before the timeout expires.
+    </p>
+
+    <h3>Backups</h3>
+    <p>
+      The wallet's stealth seed reproduces every subaddress
+      deterministically. <code>pricoin_getstealthseed</code> returns
+      the 32-byte seed (when the wallet is unlocked) — that's the
+      single value you back up. The standard <code>backupwallet</code>
+      RPC also captures everything: subaddress indices, labels, swap
+      records, transparent descriptors.
+    </p>
+
+    <h3>Transaction sizes</h3>
+    <p>
+      Per-output Borromean rangeproofs are ~1.3 KB; per-input CLSAG ring
+      sigs ~600 B. A typical 1-in/2-out withdrawal serialises to ~3.5
+      KB — about 2× a comparable Bitcoin tx. Block weight limits are
+      raised to accommodate this; mempool admission and fee estimation
+      work the same way as upstream.
+    </p>
+
+    <h3>Deposit minimum</h3>
+    <p>
+      Set a deposit minimum that comfortably covers your own per-output
+      handling cost (sweeping aggregated deposits to cold storage costs
+      ~3.5 KB per send). Dust-value deposits cost more to consolidate
+      than they're worth.
+    </p>
+
+    <h3>Hot/cold split</h3>
+    <p>
+      Standard pattern: hot wallet runs <code>pricoind</code>, holds the
+      master stealth identity, and serves <code>pricoin_listownct</code>
+      polls + <code>walletsendct</code> withdrawals. Cold wallet holds
+      a separate identity, sweeps from hot to cold via
+      <code>walletsendct</code> on a schedule. Cold-wallet
+      <code>pricoind</code> can be air-gapped; it just needs the chain
+      blocks (rsync from hot, or a separate full node) and its own
+      seed-derived view+spend keys.
+    </p>
+
+    <h3>Atomic swaps (optional)</h3>
+    <p>
+      If you want to expose BTC↔PRIC or LTC↔PRIC swaps directly to
+      users without listing PRIC on-exchange, the wallet ships a
+      Nostr-relayed orderbook + adaptor-signature swap protocol. See
+      the <a href="whitepaper.html#swap-btc">whitepaper §11–12</a> and
+      the <a href="index.html#swaps">homepage swap section</a>.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2>Reference snippets</h2>
+    <p>Common one-liners for ops dashboards / cron jobs.</p>
+
+    <h3>Sync watch</h3>
+    <pre><code># Block until the daemon is fully synced (initialblockdownload=false).
+while true; do
+  ibd=$(pricoin-cli getblockchaininfo | jq -r .initialblockdownload)
+  [ "$ibd" = "false" ] &amp;&amp; break
+  sleep 5
+done</code></pre>
+
+    <h3>Sweep a user's deposit credits</h3>
+    <pre><code># All unspent CT outputs paying user N (subaddress_index == N), summed.
+pricoin-cli -rpcwallet=hot pricoin_listownct \
+  | jq --argjson N $N '[ .outputs[] | select(.subaddress_index == $N) | .value | tonumber ] | add // 0'</code></pre>
+
+    <h3>Address validation in your withdrawal endpoint</h3>
+    <pre><code># Returns 0 (valid) or 1 (invalid). Surface the JSON to the user.
+addr=$1
+res=$(pricoin-cli validateaddress "$addr")
+echo "$res" | jq -e '.isvalid' &gt;/dev/null &amp;&amp; exit 0 || exit 1</code></pre>
+
+    <h3>List all subaddresses with their labels</h3>
+    <pre><code>pricoin-cli -rpcwallet=hot pricoin_listsubaddresses \
+  | jq -r '.[] | "\(.index)\t\(.label)\t\(.address)"'</code></pre>
+  </div>
+</section>
+
+<section class="section alt">
+  <div class="container">
+    <h2>Getting help</h2>
+    <ul class="bullet-list">
+      <li>Issues: <a href="https://github.com/pricoinfoundation/pricoin/issues">github.com/pricoinfoundation/pricoin/issues</a></li>
+      <li>Whitepaper: <a href="whitepaper.html">protocol specification</a></li>
+      <li>Source: <a href="https://github.com/pricoinfoundation/pricoin">github.com/pricoinfoundation/pricoin</a></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <img class="brand-mark" src="pricoinlogo-64.png" alt="" width="28" height="28">
+      <span>Pricoin</span>
+    </div>
+    <p class="footer-subtitle">Privacy by default. Bitcoin Core lineage. Open source.</p>
+    <p class="footer-disclaimer">
+      Experimental research software. Not for production use.
+      © 2026 The Pricoin developers. MIT licensed.
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
